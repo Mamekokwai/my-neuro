@@ -1,0 +1,10 @@
+{
+  "name": "local-files",
+  "displayName": "本地文件",
+  "version": "1.0.0",
+  "author": "ZeroThrax",
+  "description": "指定目录内搜索、读取、预览修改、版本校验写入及备份撤销",
+  "framework_version": ">=1.0.0",
+  "main": "index.js",
+  "lang": "js"
+}

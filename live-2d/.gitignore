@@ -6,6 +6,7 @@
 /.download-cache/
 /plugins-dlc/
 /.venv-asr/
+/plugins/community/local-files/.data/
 
 # 本地备份与模型素材（61MB，属于个人资产，不入库）
 config.json.bak_*

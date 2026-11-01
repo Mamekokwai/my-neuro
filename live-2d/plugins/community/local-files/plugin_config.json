@@ -1,0 +1,8 @@
+{
+  "roots": [
+    { "name": "肥鱼工作区", "path": "E:/Personalfile/肥鱼工作区", "writable": true, "create": true },
+    { "name": "当前工程", "path": "E:/Github/my-neuro", "writable": true },
+    { "name": "Obsidian笔记库", "path": "E:/Obsidian", "writable": true, "vault": true }
+  ],
+  "max_file_bytes": 1048576
+}
