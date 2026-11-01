@@ -42,43 +42,46 @@
   "肥鱼": {
     "emotion_actions": {
       "开心": [
-        "motions/hiyori_m06.motion3.json"
+        "Animation/举手切默认手.motion3.json"
       ],
       "生气": [
-        "motions/hiyori_m09.motion3.json"
+        "Animation/竖手指切出来动画.motion3.json"
       ],
       "难过": [
-        "motions/hiyori_m10.motion3.json"
+        "Animation/IDLE.motion3.json"
       ],
       "惊讶": [
-        "motions/hiyori_m07.motion3.json"
+        "Animation/狗尾草切换出来.motion3.json"
       ],
       "害羞": [
-        "motions/hiyori_m05.motion3.json"
+        "Animation/默认手切举手.motion3.json"
       ],
       "俏皮": [
-        "motions/hiyori_m08.motion3.json"
+        "Animation/竖手指切回默认.motion3.json"
       ],
       "动作1": [
-        "motions/hiyori_m01.motion3.json"
+        "Animation/举手切默认手.motion3.json"
       ],
       "动作2": [
-        "motions/hiyori_m02.motion3.json"
+        "Animation/默认手切举手.motion3.json"
       ],
       "动作3": [
-        "motions/hiyori_m03.motion3.json"
+        "Animation/狗尾草切换出来.motion3.json"
       ],
       "动作4": [
-        "motions/hiyori_m04.motion3.json"
+        "Animation/狗尾草切回默认手.motion3.json"
       ],
-      "动作11": [
-        "motions/micoff.motion3.json"
+      "动作5": [
+        "Animation/竖手指切出来动画.motion3.json"
       ],
-      "动作12": [
-        "motions/micon.motion3.json"
+      "动作6": [
+        "Animation/竖手指切回默认.motion3.json"
       ],
-      "动作13": [
-        "motions/singing.motion3.json"
+      "动作7": [
+        "Animation/脱捕.motion3.json"
+      ],
+      "动作8": [
+        "Animation/IDLE.motion3.json"
       ]
     }
   }
