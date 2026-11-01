@@ -263,13 +263,19 @@ class Live2DInteractionController {
 
             const ax = this._dragAngle.x;
             const ay = this._dragAngle.y;
-            c.setParameterValueById('ParamAngleX', ax);
-            c.setParameterValueById('ParamAngleY', ay);
+            // 头部：轻，只做视线跟随感
+            c.setParameterValueById('ParamAngleX', ax * 0.25);
+            c.setParameterValueById('ParamAngleY', ay * 0.20);
             c.setParameterValueById('ParamAngleZ', ax * 0.25);
-            c.setParameterValueById('ParamBodyAngleX', ax * 0.6);
-            // 该模型物理的输入里有非标准 id（AngleX/HipAngleX），一并写，缺哪个 ignore 哪个
-            try { c.setParameterValueById('AngleX', ax); } catch (e) {}
-            try { c.setParameterValueById('HipAngleX', ax * 0.8); } catch (e) {}
+            // 上半身：与拖动方向相反（惯性），腰部为支点
+            c.setParameterValueById('ParamBodyAngleX', -ax * 0.35);
+            c.setParameterValueById('ParamBodyAngleY', ay * 0.20);
+            c.setParameterValueById('ParamBodyAngleZ', -ax * 0.12);
+            // 下半身：与上半身反向扭转
+            c.setParameterValueById('HipAngleX', ax * 0.25);
+            c.setParameterValueById('HipAngleZ', ax * 0.10);
+            // 该模型物理的非标准输入 id，缺哪个 ignore 哪个
+            try { c.setParameterValueById('AngleX', ax * 0.2); } catch (e) {}
 
             const active = Math.abs(ax) > 0.05 || Math.abs(ay) > 0.05 ||
                            Math.abs(t.x) > 0.05 || Math.abs(t.y) > 0.05 || this.isDragging;
