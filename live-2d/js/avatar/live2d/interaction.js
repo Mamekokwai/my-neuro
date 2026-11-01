@@ -237,8 +237,8 @@ class Live2DInteractionController {
         const vx = (dx / dt) * 1000;
         const vy = (dy / dt) * 1000;
 
-        const SPEED_REF = 1200;   // px/s 达到满幅，再快就限幅
-        const TARGET_MAX = 30;    // 对应 ParamAngleX 的量程
+        const SPEED_REF = 700;    // px/s 达到满幅，再快就限幅
+        const TARGET_MAX = 45;    // 内部角度幅度，下面各轴再按量程缩放
         const nx = Math.max(-1, Math.min(1, vx / SPEED_REF));
         const ny = Math.max(-1, Math.min(1, -vy / SPEED_REF));
         this._dragAngleTarget = { x: nx * TARGET_MAX, y: ny * TARGET_MAX };
@@ -263,19 +263,21 @@ class Live2DInteractionController {
 
             const ax = this._dragAngle.x;
             const ay = this._dragAngle.y;
-            // 头部：轻，只做视线跟随感
-            c.setParameterValueById('ParamAngleX', ax * 0.25);
-            c.setParameterValueById('ParamAngleY', ay * 0.20);
-            c.setParameterValueById('ParamAngleZ', ax * 0.25);
+            // 各轴量程不同（头 ±30、身/胯 ±10），统一用 clamp 顶到边界
+            const cl = (v, lim) => Math.max(-lim, Math.min(lim, v));
+            // 头部
+            c.setParameterValueById('ParamAngleX', cl(ax * 0.55, 30));
+            c.setParameterValueById('ParamAngleY', cl(ay * 0.45, 30));
+            c.setParameterValueById('ParamAngleZ', cl(ax * 0.55, 30));
             // 上半身：与拖动方向相反（惯性），腰部为支点
-            c.setParameterValueById('ParamBodyAngleX', -ax * 0.35);
-            c.setParameterValueById('ParamBodyAngleY', ay * 0.20);
-            c.setParameterValueById('ParamBodyAngleZ', -ax * 0.12);
+            c.setParameterValueById('ParamBodyAngleX', cl(-ax * 1.2, 10));
+            c.setParameterValueById('ParamBodyAngleY', cl(ay * 0.5, 10));
+            c.setParameterValueById('ParamBodyAngleZ', cl(-ax * 0.45, 10));
             // 下半身：与上半身反向扭转
-            c.setParameterValueById('HipAngleX', ax * 0.25);
-            c.setParameterValueById('HipAngleZ', ax * 0.10);
+            c.setParameterValueById('HipAngleX', cl(ax * 0.8, 10));
+            c.setParameterValueById('HipAngleZ', cl(ax * 0.3, 10));
             // 该模型物理的非标准输入 id，缺哪个 ignore 哪个
-            try { c.setParameterValueById('AngleX', ax * 0.2); } catch (e) {}
+            try { c.setParameterValueById('AngleX', ax * 0.3); } catch (e) {}
 
             const active = Math.abs(ax) > 0.05 || Math.abs(ay) > 0.05 ||
                            Math.abs(t.x) > 0.05 || Math.abs(t.y) > 0.05 || this.isDragging;
