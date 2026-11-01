@@ -250,6 +250,20 @@ class Live2DInteractionController {
         }
     }
 
+    _pollTuner() {
+        // 调参面板（E:\Shimo	ools\pet_tuner\server.py，端口 1010）不存在就静默用默认值
+        if (this._tunerStarted) return;
+        this._tunerStarted = true;
+        const load = () => {
+            fetch('http://127.0.0.1:1010/api/params')
+                .then((r) => r.json())
+                .then((j) => { this._tune = j; })
+                .catch(() => { this._tune = null; });
+        };
+        load();
+        setInterval(load, 700);
+    }
+
     _applyDragParams() {
         const c = this.model?.internalModel?.coreModel;
         if (!c) return;
@@ -271,10 +285,13 @@ class Live2DInteractionController {
         prev.x = v.x; prev.y = v.y;
 
         // 弹簧-阻尼：外力来自加速度，加速度为 0 时只剩弹簧把位移拉回 0
-        const FORCE = 2600;   // 加速度满值对应的驱动力
-        const ACC_REF = 20000; // 认为"满加速"的量级
-        const SPRING = 70;    // 回正刚度
-        const DAMP = 13;      // 阻尼
+        this._pollTuner();
+        const T = this._tune || {};
+        const FORCE = T.force ?? 2600;      // 加速度满值对应的驱动力
+        const ACC_REF = T.acc_ref ?? 20000; // 认为"满加速"的量级
+        const SPRING = T.spring ?? 70;      // 回正刚度
+        const DAMP = T.damp ?? 13;          // 阻尼
+        const GAIN = T.gain ?? 1.2;         // 输出增益，越小越早打满
 
         const sk = this._spring || (this._spring = { x: 0, y: 0, vx: 0, vy: 0 });
         const fx = Math.tanh(acc.x / ACC_REF) * FORCE;
@@ -292,7 +309,7 @@ class Live2DInteractionController {
         // 只驱动身体链（头不转）：PositionX/Y/Z + LeanInput 满幅 ±10
         // 只写 PositionX：physics3.json 已把头发链的输入改到它身上，
         // 身体链的输入被改到永不写入的常量上，因此只有头发会动。
-        c.setParameterValueById('PositionX', cl(-sk.x / 1.2, 10));
+        c.setParameterValueById('PositionX', cl(-sk.x / GAIN, 10));
         c.setParameterValueById('PositionY', 0);
         c.setParameterValueById('PositionZ', 0);
         if (typeof c.setParameterValueById === 'function') {
