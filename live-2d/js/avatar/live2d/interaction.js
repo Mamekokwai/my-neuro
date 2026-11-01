@@ -229,16 +229,19 @@ class Live2DInteractionController {
 
     // 聊天框拖拽（保持旧行为：按住聊天框背景/消息区可拖动聊天框）
     _injectDragMotion(dx, dy) {
-        // VTS 的手感来自"模型在屏幕上的位移"持续喂给 PositionX/Y/Z，
-        // 而不是瞬时速度。这里累积拖拽位移，拖多久积多少，松手后再衰减。
-        const o = this._dragOffset || (this._dragOffset = { x: 0, y: 0 });
-        o.x = Math.max(-70, Math.min(70, o.x + dx * 0.35));
-        o.y = Math.max(-70, Math.min(70, o.y + dy * 0.35));
+        // 只负责测速：把 pointermove 的位移换成速度并低通。
+        // 加速度、弹簧积分都在 _applyDragParams 里按帧算。
+        const now = performance.now();
+        const dt = Math.max(now - (this._lastMoveT || now), 8) / 1000;
+        this._lastMoveT = now;
+        const v = this._v || (this._v = { x: 0, y: 0 });
+        v.x += (dx / dt - v.x) * 0.45;
+        v.y += (dy / dt - v.y) * 0.45;
     }
 
     _ensureMotionLoop() {
-        // IDLE 动作每帧把 ParamAngleX / ParamBodyAngleX 写回默认值，rAF 抢不过它。
-        // 挂到 afterMotionUpdate：motion 之后、physics 之前，写入既能存活又成为物理输入。
+        // IDLE 动作每帧把身体参数写回默认值，rAF 抢不过它。
+        // 挂 afterMotionUpdate：motion 之后、physics 之前。
         const im = this.model?.internalModel;
         if (!im) return;
         if (!this._motionHookBound) {
@@ -250,29 +253,45 @@ class Live2DInteractionController {
     _applyDragParams() {
         const c = this.model?.internalModel?.coreModel;
         if (!c) return;
-
-        const o = this._dragOffset || (this._dragOffset = { x: 0, y: 0 });
-        const a = this._dragAngle || (this._dragAngle = { x: 0, y: 0 });
         const cl = (v, lim) => Math.max(-lim, Math.min(lim, v));
 
-        // 位移衰减：拖拽中也轻微衰减形成拖尾，松手后快速回位
-        const decay = this.isDragging ? 0.94 : 0.90;
-        o.x *= decay; o.y *= decay;
+        const now = performance.now();
+        const dt = Math.min(Math.max((now - (this._lastFrameT || now)) / 1000, 0.001), 0.05);
+        this._lastFrameT = now;
 
-        // 平滑跟随（系数越小越绵）
-        a.x += (-o.x - a.x) * 0.18;
-        a.y += (-o.y - a.y) * 0.18;
+        const v = this._v || (this._v = { x: 0, y: 0 });
+        // 松手后速度自然衰减
+        if (!this.isDragging) { v.x *= 0.55; v.y *= 0.55; }
 
-        if (!this.isDragging && Math.abs(a.x) < 0.05 && Math.abs(a.y) < 0.05) {
-            o.x = 0; o.y = 0; a.x = 0; a.y = 0;
-            return;
-        }
+        // 加速度 = 速度的帧间变化
+        const prev = this._prevV || (this._prevV = { x: 0, y: 0 });
+        const acc = this._acc || (this._acc = { x: 0, y: 0 });
+        acc.x += ((v.x - prev.x) / dt - acc.x) * 0.35;
+        acc.y += ((v.y - prev.y) / dt - acc.y) * 0.35;
+        prev.x = v.x; prev.y = v.y;
 
-        // 先只驱动身体链，头完全不动。
-        // 侧发/后侧发的 X 由 ParamBodyAngleRX（身体位移）和 ParamBodyAngleX 驱动，
-        // 这两条都由 PositionX/PositionZ 算出，所以摆动来自下半身而不是转头。
-        const px = cl(a.x / 14, 10);
-        const py = cl(a.y / 14, 10);
+        // 弹簧-阻尼：外力来自加速度，加速度为 0 时只剩弹簧把位移拉回 0
+        const FORCE = 1500;   // 加速度满值对应的驱动力
+        const ACC_REF = 20000; // 认为"满加速"的量级
+        const SPRING = 70;    // 回正刚度
+        const DAMP = 13;      // 阻尼
+
+        const sk = this._spring || (this._spring = { x: 0, y: 0, vx: 0, vy: 0 });
+        const fx = Math.tanh(acc.x / ACC_REF) * FORCE;
+        const fy = Math.tanh(acc.y / ACC_REF) * FORCE;
+
+        sk.vx += (fx - SPRING * sk.x - DAMP * sk.vx) * dt;
+        sk.vy += (fy - SPRING * sk.y - DAMP * sk.vy) * dt;
+        sk.x = cl(sk.x + sk.vx * dt, 45);
+        sk.y = cl(sk.y + sk.vy * dt, 45);
+
+        const rest = Math.abs(sk.x) < 0.05 && Math.abs(sk.y) < 0.05 &&
+                     Math.abs(sk.vx) < 0.05 && Math.abs(sk.vy) < 0.05 && !this.isDragging;
+        if (rest) { sk.x = 0; sk.y = 0; sk.vx = 0; sk.vy = 0; return; }
+
+        // 只驱动身体链（头不转）：PositionX/Y/Z + LeanInput 满幅 ±10
+        const px = cl(-sk.x / 2, 10);
+        const py = cl(-sk.y / 2, 10);
         c.setParameterValueById('PositionX', px);
         c.setParameterValueById('PositionY', cl(py * 0.6, 10));
         c.setParameterValueById('PositionZ', cl(px * 0.6, 10));
