@@ -10,3 +10,7 @@
 # 本地备份与模型素材（61MB，属于个人资产，不入库）
 config.json.bak_*
 2D/肥鱼/
+
+# 运行时状态与临时补丁备份
+avatar-loading-position.json
+*.before-*
