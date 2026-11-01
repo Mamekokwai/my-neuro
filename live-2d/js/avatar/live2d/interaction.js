@@ -281,10 +281,14 @@ class Live2DInteractionController {
 
         // 头部（Angle 系列）
         // Y：向下拖 → 抬头，Z：向左拖 → 向右歪头，两者方向都与原始位移相反
-        c.setParameterValueById('AngleX', cl(nx * 1.0, 1) * 10);
-        c.setParameterValueById('AngleY', cl(-ny * 1.0, 1) * 10);
+        // 抬头低头（pitch）是主手感通道，权重给足；并且直写 ParamAngleY，
+        // 和 ParamAngleZ 一样走"不经过物理"的直通路径，跟手更明显。
+        c.setParameterValueById('AngleX', cl(nx * 1.0, 1) * 18);
+        c.setParameterValueById('AngleY', cl(-ny * 1.0, 1) * 28);
         c.setParameterValueById('AngleZ', cl(-nx * 1.5, 1) * 10);
+        c.setParameterValueById('ParamAngleY', cl(-ay * 0.70, 30));
         c.setParameterValueById('ParamAngleZ', cl(-ax * 0.55, 30));
+        c.setParameterValueById('ParamAngleX', cl(ax * 0.35, 30));
 
         // 身体：拖左 → 身体右倾（取反）
         c.setParameterValueById('PositionX', cl(-nx, 1));
