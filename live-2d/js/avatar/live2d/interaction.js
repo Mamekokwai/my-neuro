@@ -273,18 +273,23 @@ class Live2DInteractionController {
         if (!this.isDragging && Math.abs(ax) < 0.02 && Math.abs(ay) < 0.02) return;
 
         const cl = (v, lim) => Math.max(-lim, Math.min(lim, v));
-        // 头部
-        c.setParameterValueById('ParamAngleX', cl(ax * 0.55, 30));
-        c.setParameterValueById('ParamAngleY', cl(ay * 0.45, 30));
-        c.setParameterValueById('ParamAngleZ', cl(ax * 0.55, 30));
-        // 上半身：与拖动方向相反（惯性），腰部为支点
-        c.setParameterValueById('ParamBodyAngleX', cl(-ax * 1.2, 10));
-        c.setParameterValueById('ParamBodyAngleY', cl(ay * 0.5, 10));
-        c.setParameterValueById('ParamBodyAngleZ', cl(-ax * 0.45, 10));
-        // 下半身：与上半身反向扭转
-        c.setParameterValueById('HipAngleX', cl(ax * 0.8, 10));
-        c.setParameterValueById('HipAngleZ', cl(ax * 0.3, 10));
-        try { c.setParameterValueById('AngleX', ax * 0.3); } catch (e) {}
+        // 该模型的物理链：AngleX/Y/Z → 头部；PositionX/Y/Z → 身体(ParamBodyAngleX)
+        // / 胯(HipAngleX) / 胸部。ParamBodyAngleX 等是物理的输出，直接写会被覆盖，
+        // 所以只喂物理的输入参数。
+        const nx = ax / 45;   // 归一化到 [-1, 1]
+        const ny = ay / 45;
+
+        // 头部（Angle 系列）
+        c.setParameterValueById('AngleX', cl(nx * 1.0, 1) * 10);
+        c.setParameterValueById('AngleY', cl(ny * 1.0, 1) * 10);
+        c.setParameterValueById('AngleZ', cl(nx * 1.5, 1) * 10);
+        c.setParameterValueById('ParamAngleZ', cl(ax * 0.55, 30));  // 已验证有效，保留
+
+        // 身体：拖左 → 身体右倾（取反）
+        c.setParameterValueById('PositionX', cl(-nx, 1));
+        c.setParameterValueById('PositionY', cl(ny, 1));
+        c.setParameterValueById('PositionZ', cl(-nx * 0.5, 1));
+        c.setParameterValueById('LeanInput', cl(-nx, 1));
     }
 
     _setupChatDrag() {
