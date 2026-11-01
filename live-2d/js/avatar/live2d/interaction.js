@@ -295,11 +295,15 @@ class Live2DInteractionController {
         c.setParameterValueById('ParamAngleZ', cl(-ax * 0.55, 30));
         c.setParameterValueById('ParamAngleX', cl(ax * 0.35, 30));
 
-        // 身体：拖左 → 身体右倾（取反）
-        c.setParameterValueById('PositionX', cl(-nx, 1));
-        c.setParameterValueById('PositionY', cl(ny, 1));
-        c.setParameterValueById('PositionZ', cl(-nx * 0.5, 1));
-        c.setParameterValueById('LeanInput', cl(-nx, 1));
+        // 身体一级部位全靠这四条纯输入往下游传导：
+        // PositionX → 身体偏转/胯/胸/丝带；PositionY → 胸/肩/胯Y；
+        // PositionZ → 胯/腿/丝带；LeanInput → 胸/肩/腰。
+        // 量程按 ±8 试（自定义参数常常不是 ±1，之前给 1 可能只用到一成）。
+        const BODY_SCALE = 8;
+        c.setParameterValueById('PositionX', cl(-nx * BODY_SCALE, BODY_SCALE));
+        c.setParameterValueById('PositionY', cl(ny * BODY_SCALE, BODY_SCALE));
+        c.setParameterValueById('PositionZ', cl(-nx * BODY_SCALE * 0.6, BODY_SCALE));
+        c.setParameterValueById('LeanInput', cl(-nx * BODY_SCALE, BODY_SCALE));
     }
 
     _setupChatDrag() {
