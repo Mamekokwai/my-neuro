@@ -301,11 +301,18 @@ class Live2DInteractionController {
             return;
         }
 
-        // 只写 PositionX：physics3 已把头发链输入改到它身上，身体链旁路到常量
-        c.setParameterValueById('PositionX', cl(-sk.x / GAIN, 10));
+        // 按拖动方向分开给权重：一个方向主推、另一个方向只带一点，
+        // 这样反向回来时不会整片头发硬拽回来，违和感小。
+        // PositionX 驱动全部头发；LeanInput 单独驱动右侧发/耳朵，给反向残余。
+        const W_POS = T.w_pos ?? 1.0;
+        const W_NEG = T.w_neg ?? 0.45;
+        const W_OPP = T.w_opp ?? 0.25;
+        const base = cl(-sk.x / GAIN, 10);
+        const w = base >= 0 ? W_POS : W_NEG;
+        c.setParameterValueById('PositionX', cl(base * w, 10));
+        c.setParameterValueById('LeanInput', cl(-base * W_OPP, 10));
         c.setParameterValueById('PositionY', 0);
         c.setParameterValueById('PositionZ', 0);
-        try { c.setParameterValueById('LeanInput', 0); } catch (e) {}
 
         this._applyManual(c, T);
         this._pushLive(c);
