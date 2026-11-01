@@ -241,7 +241,12 @@ class Live2DInteractionController {
         const TARGET_MAX = 45;    // 内部角度幅度，下面各轴再按量程缩放
         const nx = Math.max(-1, Math.min(1, vx / SPEED_REF));
         const ny = Math.max(-1, Math.min(1, -vy / SPEED_REF));
-        this._dragAngleTarget = { x: nx * TARGET_MAX, y: ny * TARGET_MAX };
+        // 瞬时速度抖动大，先做一层低通再当目标值（0.22 越小越绵）
+        const vt = { x: nx * TARGET_MAX, y: ny * TARGET_MAX };
+        this._vSmooth = this._vSmooth || { x: 0, y: 0 };
+        this._vSmooth.x += (vt.x - this._vSmooth.x) * 0.22;
+        this._vSmooth.y += (vt.y - this._vSmooth.y) * 0.22;
+        this._dragAngleTarget = { x: this._vSmooth.x, y: this._vSmooth.y };
         this._ensureMotionLoop();
     }
 
@@ -263,7 +268,7 @@ class Live2DInteractionController {
         if (!c) return;
 
         const t = this._dragAngleTarget || { x: 0, y: 0 };
-        const k = this.isDragging ? 0.35 : 0.10;
+        const k = this.isDragging ? 0.16 : 0.05;
         this._dragAngle = this._dragAngle || { x: 0, y: 0 };
         this._dragAngle.x += (t.x - this._dragAngle.x) * k;
         this._dragAngle.y += (t.y - this._dragAngle.y) * k;
