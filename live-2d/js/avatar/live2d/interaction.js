@@ -246,49 +246,45 @@ class Live2DInteractionController {
     }
 
     _ensureMotionLoop() {
-        if (this._motionLoopRunning) return;
-        const core = this.model?.internalModel?.coreModel;
-        if (!core) return;
-        this._motionLoopRunning = true;
+        // IDLE 动作每帧都会把 ParamAngleX / ParamBodyAngleX 写回默认值，
+        // 用 requestAnimationFrame 抢不过它。改挂到 afterMotionUpdate：
+        // 该事件在 motion.update() 之后、physics 之前触发，写入的数值既能躲开覆盖，
+        // 又能被物理演算当成输入。
+        const im = this.model?.internalModel;
+        if (!im) return;
+        if (!this._motionHookBound) {
+            im.on('afterMotionUpdate', () => this._applyDragParams());
+            this._motionHookBound = true;
+        }
+    }
+
+    _applyDragParams() {
+        const c = this.model?.internalModel?.coreModel;
+        if (!c) return;
+
+        const t = this._dragAngleTarget || { x: 0, y: 0 };
+        const k = this.isDragging ? 0.35 : 0.10;
         this._dragAngle = this._dragAngle || { x: 0, y: 0 };
+        this._dragAngle.x += (t.x - this._dragAngle.x) * k;
+        this._dragAngle.y += (t.y - this._dragAngle.y) * k;
 
-        const step = () => {
-            const c = this.model?.internalModel?.coreModel;
-            if (!c) { this._motionLoopRunning = false; return; }
+        const ax = this._dragAngle.x;
+        const ay = this._dragAngle.y;
+        if (!this.isDragging && Math.abs(ax) < 0.02 && Math.abs(ay) < 0.02) return;
 
-            const t = this._dragAngleTarget || { x: 0, y: 0 };
-            const k = this.isDragging ? 0.35 : 0.10;  // 拖拽时跟手，松手后缓慢回落交给物理
-            this._dragAngle.x += (t.x - this._dragAngle.x) * k;
-            this._dragAngle.y += (t.y - this._dragAngle.y) * k;
-
-            const ax = this._dragAngle.x;
-            const ay = this._dragAngle.y;
-            // 各轴量程不同（头 ±30、身/胯 ±10），统一用 clamp 顶到边界
-            const cl = (v, lim) => Math.max(-lim, Math.min(lim, v));
-            // 头部
-            c.setParameterValueById('ParamAngleX', cl(ax * 0.55, 30));
-            c.setParameterValueById('ParamAngleY', cl(ay * 0.45, 30));
-            c.setParameterValueById('ParamAngleZ', cl(ax * 0.55, 30));
-            // 上半身：与拖动方向相反（惯性），腰部为支点
-            c.setParameterValueById('ParamBodyAngleX', cl(-ax * 1.2, 10));
-            c.setParameterValueById('ParamBodyAngleY', cl(ay * 0.5, 10));
-            c.setParameterValueById('ParamBodyAngleZ', cl(-ax * 0.45, 10));
-            // 下半身：与上半身反向扭转
-            c.setParameterValueById('HipAngleX', cl(ax * 0.8, 10));
-            c.setParameterValueById('HipAngleZ', cl(ax * 0.3, 10));
-            // 该模型物理的非标准输入 id，缺哪个 ignore 哪个
-            try { c.setParameterValueById('AngleX', ax * 0.3); } catch (e) {}
-
-            const active = Math.abs(ax) > 0.05 || Math.abs(ay) > 0.05 ||
-                           Math.abs(t.x) > 0.05 || Math.abs(t.y) > 0.05 || this.isDragging;
-            if (active) {
-                requestAnimationFrame(step);
-            } else {
-                this._motionLoopRunning = false;
-                this._dragAngle = { x: 0, y: 0 };
-            }
-        };
-        requestAnimationFrame(step);
+        const cl = (v, lim) => Math.max(-lim, Math.min(lim, v));
+        // 头部
+        c.setParameterValueById('ParamAngleX', cl(ax * 0.55, 30));
+        c.setParameterValueById('ParamAngleY', cl(ay * 0.45, 30));
+        c.setParameterValueById('ParamAngleZ', cl(ax * 0.55, 30));
+        // 上半身：与拖动方向相反（惯性），腰部为支点
+        c.setParameterValueById('ParamBodyAngleX', cl(-ax * 1.2, 10));
+        c.setParameterValueById('ParamBodyAngleY', cl(ay * 0.5, 10));
+        c.setParameterValueById('ParamBodyAngleZ', cl(-ax * 0.45, 10));
+        // 下半身：与上半身反向扭转
+        c.setParameterValueById('HipAngleX', cl(ax * 0.8, 10));
+        c.setParameterValueById('HipAngleZ', cl(ax * 0.3, 10));
+        try { c.setParameterValueById('AngleX', ax * 0.3); } catch (e) {}
     }
 
     _setupChatDrag() {
