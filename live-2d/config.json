@@ -143,8 +143,8 @@
     "model_position": {
       "x": 0.5483040683903566,
       "y": 0.2473080231342701,
-      "x_dual": 0.07874996185302735,
-      "y_dual": 0.2662340987042683,
+      "x_dual": 0.0275,
+      "y_dual": 0.2752097799161585,
       "remember_position": true,
       "bounce_back": true,
       "display": {

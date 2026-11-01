@@ -267,6 +267,7 @@ class Live2DInteractionController {
         const VDECAY = T.vel_decay ?? 0.55;
         const EPS = T.rest_eps ?? 0.05;
         const MAX_DT = (T.max_dt ?? 50) / 1000;
+        // T.manual 由面板下发，见下方覆盖逻辑
 
         const now = performance.now();
         const dt = Math.min(Math.max((now - (this._lastFrameT || now)) / 1000, 0.001), MAX_DT);
@@ -293,13 +294,47 @@ class Live2DInteractionController {
 
         const rest = Math.abs(sk.x) < EPS && Math.abs(sk.y) < EPS &&
                      Math.abs(sk.vx) < EPS && Math.abs(sk.vy) < EPS && !this.isDragging;
-        if (rest) { sk.x = 0; sk.y = 0; sk.vx = 0; sk.vy = 0; return; }
+        if (rest) {
+            sk.x = 0; sk.y = 0; sk.vx = 0; sk.vy = 0;
+            this._applyManual(c, T);
+            this._pushLive(c);
+            return;
+        }
 
         // 只写 PositionX：physics3 已把头发链输入改到它身上，身体链旁路到常量
         c.setParameterValueById('PositionX', cl(-sk.x / GAIN, 10));
         c.setParameterValueById('PositionY', 0);
         c.setParameterValueById('PositionZ', 0);
         try { c.setParameterValueById('LeanInput', 0); } catch (e) {}
+
+        this._applyManual(c, T);
+        this._pushLive(c);
+    }
+
+    _applyManual(c, T) {
+        // 面板上手拖的覆盖值优先于自动物理
+        const manual = T.manual || {};
+        for (const pid in manual) {
+            try { c.setParameterValueById(pid, manual[pid]); } catch (e) {}
+        }
+    }
+
+    _pushLive(c) {
+        // 把当前参数值回报给调参面板，10Hz 足够看清变化
+        const now = performance.now();
+        if (now - (this._liveT || 0) < 100) return;
+        this._liveT = now;
+        const IDS = ['PositionX', 'PositionY', 'PositionZ', 'LeanInput',
+                     'ParamBodyAngleX', 'ParamBodyAngleY', 'ParamBodyAngleZ',
+                     'HipAngleX', 'HipAngleZ',
+                     'ParamAngleX', 'ParamAngleY', 'ParamAngleZ', 'ParamBreath',
+                     'FrontHairX1', 'ShortPonytailX1', 'LateHairZ'];
+        const out = {};
+        for (const id of IDS) {
+            try { const v = c.getParameterValueById(id); if (v !== undefined) out[id] = v; } catch (e) {}
+        }
+        fetch('http://127.0.0.1:1010/api/live', { method: 'POST', body: JSON.stringify(out) })
+            .catch(() => {});
     }
 
     _pollTuner() {
@@ -356,7 +391,12 @@ class Live2DInteractionController {
 
         const rest = Math.abs(sk.x) < 0.05 && Math.abs(sk.y) < 0.05 &&
                      Math.abs(sk.vx) < 0.05 && Math.abs(sk.vy) < 0.05 && !this.isDragging;
-        if (rest) { sk.x = 0; sk.y = 0; sk.vx = 0; sk.vy = 0; return; }
+        if (rest) {
+            sk.x = 0; sk.y = 0; sk.vx = 0; sk.vy = 0;
+            this._applyManual(c, T);
+            this._pushLive(c);
+            return;
+        }
 
         // 只驱动身体链（头不转）：PositionX/Y/Z + LeanInput 满幅 ±10
         // 只写 PositionX：physics3.json 已把头发链的输入改到它身上，
@@ -620,6 +660,25 @@ class Live2DInteractionController {
         this.updateInteractionArea();
         // 防御：若配置里存了越界的相对位置（例如旧版跨屏 bug 导致的负值），启动时吸回当前窗口内。
         this._clampModelToWindow();
+        this._bindPhysicsHook();
+    }
+
+    _bindPhysicsHook() {
+        // 模型是异步加载的，这里轮询直到 internalModel 就绪，
+        // 挂上 afterMotionUpdate 后即使不拖拽，实时面板也有数据。
+        const tryBind = () => {
+            const im = this.model?.internalModel;
+            if (!im?.coreModel) return false;
+            this._ensureMotionLoop();
+            this._pollTuner();
+            this._pushLive(im.coreModel);
+            return true;
+        };
+        if (tryBind()) return;
+        let tries = 0;
+        const timer = setInterval(() => {
+            if (tryBind() || ++tries > 40) clearInterval(timer);
+        }, 500);
     }
 
     _scheduleSave() {
