@@ -301,16 +301,14 @@ class Live2DInteractionController {
             return;
         }
 
-        // 按拖动方向分开给权重：一个方向主推、另一个方向只带一点，
-        // 这样反向回来时不会整片头发硬拽回来，违和感小。
-        // PositionX 驱动全部头发；LeanInput 单独驱动右侧发/耳朵，给反向残余。
-        const W_POS = T.w_pos ?? 1.0;
-        const W_NEG = T.w_neg ?? 0.45;
-        const W_OPP = T.w_opp ?? 0.25;
+        // 左右头发各用一个参数：右发走 PositionX，左发走 LeanInput。
+        // 每侧两档权重——朝各自"漂浮方向"拖给满幅，反向拖只给一点点（归位），
+        // 这样反向回来时头发是轻轻飘回去，而不是被硬拽回原位。
         const base = cl(-sk.x / GAIN, 10);
-        const w = base >= 0 ? W_POS : W_NEG;
-        c.setParameterValueById('PositionX', cl(base * w, 10));
-        c.setParameterValueById('LeanInput', cl(-base * W_OPP, 10));
+        const right = base >= 0 ? base * (T.w_rf ?? 1.0) : base * (T.w_rr ?? 0.3);
+        const left = base >= 0 ? base * (T.w_lr ?? -0.3) : base * (T.w_lf ?? -1.0);
+        c.setParameterValueById('PositionX', cl(right, 10));
+        c.setParameterValueById('LeanInput', cl(left, 10));
         c.setParameterValueById('PositionY', 0);
         c.setParameterValueById('PositionZ', 0);
 
