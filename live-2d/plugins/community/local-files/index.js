@@ -1,8 +1,9 @@
 'use strict';
 
 const path = require('path');
+const { fork } = require('child_process');
 const { Plugin } = require('../../../js/core/plugin-base.js');
-const { FileWorkspace, FileError } = require('./file-workspace.js');
+const { FileError } = require('./file-workspace.js');
 const text = description => ({ type: 'string', description });
 const integer = description => ({ type: 'integer', description });
 const tool = (name, description, properties = {}, required = []) => ({ type: 'function', function: {
@@ -41,8 +42,75 @@ const TOOLS = [
 class LocalFilesPlugin extends Plugin {
     async onInit() {
         const cfg = this.context.getPluginFileConfig();
-        this.workspace = new FileWorkspace({ roots: cfg.roots || [], stateDir: path.join(__dirname, '.data'),
+        await this.startService({ roots: cfg.roots || [], stateDir: path.join(__dirname, '.data'),
             protectedPaths: [__dirname], maxBytes: cfg.max_file_bytes || 1048576 });
+    }
+
+    startService(config) {
+        this._requests = new Map();
+        this._requestId = 0;
+        this._serviceStopped = false;
+        return new Promise((resolve, reject) => {
+            // Scanning a vault must not block the renderer's microphone and animation callbacks.
+            this._worker = fork(path.join(__dirname, 'worker.js'), [], {
+                execPath: process.execPath, windowsHide: true,
+                env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+                stdio: ['ignore', 'ignore', 'ignore', 'ipc']
+            });
+            const timer = setTimeout(() => {
+                this._worker?.kill();
+                reject(new FileError('SERVICE_TIMEOUT', '本地文件后台服务启动超时'));
+            }, 10000);
+            this._worker.on('message', msg => {
+                if (msg.ready) {
+                    clearTimeout(timer);
+                    this.workspace = { roots: msg.roots, rootsInfo: () => msg.roots };
+                    resolve();
+                } else if (msg.failed) {
+                    clearTimeout(timer);
+                    this._worker?.kill();
+                    reject(new FileError(msg.failed.code, msg.failed.message));
+                }
+                else {
+                    const pending = this._requests.get(msg.id);
+                    if (!pending) return;
+                    this._requests.delete(msg.id);
+                    if (msg.error) pending.reject(new FileError(msg.error.code, msg.error.message, msg.error.details));
+                    else pending.resolve(msg.result);
+                }
+            });
+            const failPending = error => {
+                clearTimeout(timer);
+                this._serviceStopped = true;
+                for (const request of this._requests.values()) request.reject(error);
+                this._requests.clear();
+                reject(error);
+            };
+            this._worker.on('error', failPending);
+            this._worker.on('exit', () => failPending(new FileError('SERVICE_STOPPED', '文件服务已停止，请重新加载插件')));
+            this._worker.send({ init: config });
+        });
+    }
+
+    async onStop() {
+        if (this._worker && !this._serviceStopped) {
+            const child = this._worker;
+            await new Promise(resolve => { child.once('exit', resolve); child.kill(); });
+        }
+        this._worker = null;
+    }
+
+    callWorkspace(method, params) {
+        if (this._serviceStopped) throw new FileError('SERVICE_STOPPED', '文件服务已停止，请重新加载插件');
+        if (!this._worker) return this.workspace[method](params);
+        return new Promise((resolve, reject) => {
+            const id = ++this._requestId;
+            this._requests.set(id, { resolve, reject });
+            try { this._worker.send({ id, method, params }, error => {
+                if (error) { this._requests.delete(id); reject(error); }
+            }); }
+            catch (error) { this._requests.delete(id); reject(error); }
+        });
     }
 
     async onStart() { this.context.log('info', `本地文件工具已就绪，开放 ${this.workspace.roots.length} 个目录`); }
@@ -76,7 +144,7 @@ Obsidian实际路径为E:/Obsidian。新建笔记前搜索同主题、读取根A
             files_read: 'read', files_preview_change: 'preview', files_apply_change: 'apply', files_history: 'history', files_undo_change: 'undo' };
         if (!methods[name]) throw new Error(`未知文件工具：${name}`);
         try {
-            const result = this.workspace[methods[name]](params || {});
+            const result = await this.callWorkspace(methods[name], params || {});
             if (['files_apply_change', 'files_undo_change'].includes(name)) this.context.log('info', `${name} 完成: ${result.path} (${result.change_id || result.id})`);
             return JSON.stringify({ ok: true, result });
         } catch (error) {

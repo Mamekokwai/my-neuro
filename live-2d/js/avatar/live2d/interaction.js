@@ -147,6 +147,8 @@ class Live2DInteractionController {
             if (extend?.extend && extend?.left && newX < 0) newX = 0;
 
             this.model.position.set(newX, newY);
+            this._injectDragMotion(newX - (this._lastPos?.x ?? newX), newY - (this._lastPos?.y ?? newY));
+            this._lastPos = { x: newX, y: newY };
             this.updateInteractionArea();
             this._maybeExpandPetWindow(newX, newY);
             this._notifyActivity();
@@ -155,6 +157,10 @@ class Live2DInteractionController {
         this._on(window, 'pointerup', (e) => {
             if (!this.isDragging) return;
             this.isDragging = false;
+            this._lastPos = null;
+            // 松手：目标角归零，物理惯性会让头发尾巴多甩两下
+            this._dragAngleTarget = { x: 0, y: 0 };
+            this._ensureMotionLoop();
 
             // 点击判定：位移小且时间短 -> 触发 Tap 动作（旧实现因拖拽误触被整段禁用，
             // 这里用位移阈值解决误触问题后恢复该交互）
@@ -222,6 +228,61 @@ class Live2DInteractionController {
     }
 
     // 聊天框拖拽（保持旧行为：按住聊天框背景/消息区可拖动聊天框）
+    _injectDragMotion(dx, dy) {
+        // 窗口拖拽本身不会让模型"感觉到"运动，物理演算只看参数。
+        // 这里把窗口位移换算成头部/胸腔的角度偏移注入进去，物理层自然产生滞后摆动。
+        const now = performance.now();
+        const dt = Math.max(now - (this._lastDragT || now), 8);
+        this._lastDragT = now;
+        const vx = (dx / dt) * 1000;
+        const vy = (dy / dt) * 1000;
+
+        const SPEED_REF = 1200;   // px/s 达到满幅，再快就限幅
+        const TARGET_MAX = 30;    // 对应 ParamAngleX 的量程
+        const nx = Math.max(-1, Math.min(1, vx / SPEED_REF));
+        const ny = Math.max(-1, Math.min(1, -vy / SPEED_REF));
+        this._dragAngleTarget = { x: nx * TARGET_MAX, y: ny * TARGET_MAX };
+        this._ensureMotionLoop();
+    }
+
+    _ensureMotionLoop() {
+        if (this._motionLoopRunning) return;
+        const core = this.model?.internalModel?.coreModel;
+        if (!core) return;
+        this._motionLoopRunning = true;
+        this._dragAngle = this._dragAngle || { x: 0, y: 0 };
+
+        const step = () => {
+            const c = this.model?.internalModel?.coreModel;
+            if (!c) { this._motionLoopRunning = false; return; }
+
+            const t = this._dragAngleTarget || { x: 0, y: 0 };
+            const k = this.isDragging ? 0.35 : 0.10;  // 拖拽时跟手，松手后缓慢回落交给物理
+            this._dragAngle.x += (t.x - this._dragAngle.x) * k;
+            this._dragAngle.y += (t.y - this._dragAngle.y) * k;
+
+            const ax = this._dragAngle.x;
+            const ay = this._dragAngle.y;
+            c.setParameterValueById('ParamAngleX', ax);
+            c.setParameterValueById('ParamAngleY', ay);
+            c.setParameterValueById('ParamAngleZ', ax * 0.25);
+            c.setParameterValueById('ParamBodyAngleX', ax * 0.6);
+            // 该模型物理的输入里有非标准 id（AngleX/HipAngleX），一并写，缺哪个 ignore 哪个
+            try { c.setParameterValueById('AngleX', ax); } catch (e) {}
+            try { c.setParameterValueById('HipAngleX', ax * 0.8); } catch (e) {}
+
+            const active = Math.abs(ax) > 0.05 || Math.abs(ay) > 0.05 ||
+                           Math.abs(t.x) > 0.05 || Math.abs(t.y) > 0.05 || this.isDragging;
+            if (active) {
+                requestAnimationFrame(step);
+            } else {
+                this._motionLoopRunning = false;
+                this._dragAngle = { x: 0, y: 0 };
+            }
+        };
+        requestAnimationFrame(step);
+    }
+
     _setupChatDrag() {
         const chatContainer = document.getElementById('text-chat-container');
         if (!chatContainer) return;

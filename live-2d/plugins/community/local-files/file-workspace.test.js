@@ -158,3 +158,33 @@ test('插件注入使用说明、正确路由工具并返回结构化错误', as
     const denied = JSON.parse(await plugin.executeTool('files_read', { path: path.dirname(root) }));
     assert.equal(denied.ok, false); assert.equal(denied.code, 'OUTSIDE_ROOT');
 });
+
+test('笔记库按规则读写文本，拒绝把附件写入库内', t => {
+    const { root, workspace: w } = fixture(t);
+    w.roots[0].vault = true;
+    const rules = path.join(root, 'AGENTS.md'); fs.writeFileSync(rules, '按领域归档，附件外置');
+    w.read({ path: rules });
+    assert.throws(() => w.preview({ path: path.join(root, 'image.svg'), operation: 'create', content: '<svg/>' }), error('VAULT_FORMAT'));
+    const preview = w.preview({ path: path.join(root, '笔记.md'), operation: 'create', content: '# 笔记\n' });
+    const result = w.apply(preview);
+    assert.equal(result.verified, true);
+    assert.match(result.vault_follow_up, /审计/);
+});
+
+test('后台进程完成预览、应用、读取及撤销，异常也保留错误码', async t => {
+    const { root, config } = fixture(t);
+    const plugin = new LocalFilesPlugin({}, { log() {} });
+    await plugin.startService(config);
+    t.after(() => plugin.onStop());
+    const file = path.join(root, 'worker.txt');
+    const preview = JSON.parse(await plugin.executeTool('files_preview_change', { path: file, operation: 'create', content: '后台线程' }));
+    assert.equal(preview.ok, true);
+    const applied = JSON.parse(await plugin.executeTool('files_apply_change', preview.result));
+    assert.equal(applied.result.verified, true);
+    const read = JSON.parse(await plugin.executeTool('files_read', { path: file }));
+    assert.equal(read.result.content, '后台线程');
+    const undone = JSON.parse(await plugin.executeTool('files_undo_change', { change_id: preview.result.change_id }));
+    assert.equal(undone.result.verified, true);
+    const denied = JSON.parse(await plugin.executeTool('files_read', { path: path.dirname(root) }));
+    assert.equal(denied.code, 'OUTSIDE_ROOT');
+});

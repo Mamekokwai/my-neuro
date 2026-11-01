@@ -1,6 +1,7 @@
 {
   "plugins": [
     "built-in/web-search",
-    "community/dawn-dusk-line"
+    "community/dawn-dusk-line",
+    "community/local-files"
   ]
 }
