@@ -10,6 +10,7 @@
 const { logToTerminal } = require('../../api-utils.js');
 const { ParamDirector } = require('./param-director.js');
 const { AuDriver } = require('./expression/au-driver.js');
+const { Live2DTunerBridge } = require('./tuner-bridge.js');
 const {
     LIVE2D_MOUTH_OPEN_PARAMS,
     LIVE2D_MOUTH_FALLBACK_PARAMS
@@ -221,6 +222,7 @@ class Live2DRuntime {
                     try { coreModel.setParameterValueByIndex(this._breathParamIdx, v); } catch (_) {}
                 }
             } catch (_) {}
+            try { this.tunerBridge?.beforeRender(coreModel); } catch (_) {}
             if (origCoreUpdate) origCoreUpdate();
         };
 
@@ -228,11 +230,19 @@ class Live2DRuntime {
         this._eyeCenterLocal = this._findEyeCenter(internalModel, coreModel);
         logToTerminal('info', `[Gaze] 眼睛位置: ${JSON.stringify(this._eyeCenterLocal)}`);
         this._installed = true;
+        this.tunerBridge = new Live2DTunerBridge(model, { log: logToTerminal });
+        global.live2dTuner = this.tunerBridge;
+        this.tunerBridge.start();
         logToTerminal('info', `[Live2DRuntime] 已安装: 嘴部=${Object.keys(this._mouthParamIndices).join('/') || '无'}, 程序化眨眼=${this._blinkEnabled ? '开' : '关(SDK原生或无参数)'}, 呼吸兜底=${this._breathEnabled ? '开' : '关(SDK原生)'}, 视线跟随=${this._gazeEnabled ? '开' : '关'}(强度${this._focusFactor})`);
         return true;
     }
 
     detach() {
+        if (this.tunerBridge) {
+            this.tunerBridge.stop();
+            if (global.live2dTuner === this.tunerBridge) global.live2dTuner = null;
+            this.tunerBridge = null;
+        }
         if (this.auDriver) {
             try { this.auDriver.destroy(); } catch (_) {}
             if (global.auDriver === this.auDriver) global.auDriver = null;
