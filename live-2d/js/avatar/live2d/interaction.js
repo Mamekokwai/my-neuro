@@ -271,7 +271,7 @@ class Live2DInteractionController {
         prev.x = v.x; prev.y = v.y;
 
         // 弹簧-阻尼：外力来自加速度，加速度为 0 时只剩弹簧把位移拉回 0
-        const FORCE = 1500;   // 加速度满值对应的驱动力
+        const FORCE = 2600;   // 加速度满值对应的驱动力
         const ACC_REF = 20000; // 认为"满加速"的量级
         const SPRING = 70;    // 回正刚度
         const DAMP = 13;      // 阻尼
@@ -292,7 +292,7 @@ class Live2DInteractionController {
         // 只驱动身体链（头不转）：PositionX/Y/Z + LeanInput 满幅 ±10
         // 只写 PositionX：physics3.json 已把头发链的输入改到它身上，
         // 身体链的输入被改到永不写入的常量上，因此只有头发会动。
-        c.setParameterValueById('PositionX', cl(-sk.x / 2, 10));
+        c.setParameterValueById('PositionX', cl(-sk.x / 1.2, 10));
         c.setParameterValueById('PositionY', 0);
         c.setParameterValueById('PositionZ', 0);
         if (typeof c.setParameterValueById === 'function') {
