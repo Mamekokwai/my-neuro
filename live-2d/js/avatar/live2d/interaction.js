@@ -147,6 +147,8 @@ class Live2DInteractionController {
             if (extend?.extend && extend?.left && newX < 0) newX = 0;
 
             this.model.position.set(newX, newY);
+            this._injectDragMotion(newX - (this._lastPos?.x ?? newX), newY - (this._lastPos?.y ?? newY));
+            this._lastPos = { x: newX, y: newY };
             this.updateInteractionArea();
             this._maybeExpandPetWindow(newX, newY);
             this._notifyActivity();
@@ -155,6 +157,7 @@ class Live2DInteractionController {
         this._on(window, 'pointerup', (e) => {
             if (!this.isDragging) return;
             this.isDragging = false;
+            this._lastPos = null;
 
             // 点击判定：位移小且时间短 -> 触发 Tap 动作（旧实现因拖拽误触被整段禁用，
             // 这里用位移阈值解决误触问题后恢复该交互）
@@ -473,6 +476,42 @@ class Live2DInteractionController {
         this.updateInteractionArea();
         // 防御：若配置里存了越界的相对位置（例如旧版跨屏 bug 导致的负值），启动时吸回当前窗口内。
         this._clampModelToWindow();
+        this._bindHairPhysics();
+    }
+
+    _bindHairPhysics() {
+        // 头发链的输入已改到 PositionX，这里每帧把拖拽位移写进去。
+        // 模型异步加载，轮询到 internalModel 就绪再挂。
+        const bind = () => {
+            const im = this.model?.internalModel;
+            if (!im?.coreModel) return false;
+            if (!this._hairHook) {
+                im.on('afterMotionUpdate', () => this._applyDragPhysics());
+                this._hairHook = true;
+            }
+            return true;
+        };
+        if (bind()) return;
+        let n = 0;
+        const t = setInterval(() => { if (bind() || ++n > 40) clearInterval(t); }, 500);
+    }
+
+    _injectDragMotion(dx, dy) {
+        const o = this._dragOffset || (this._dragOffset = { x: 0, y: 0 });
+        o.x = Math.max(-240, Math.min(240, o.x + dx));
+        o.y = Math.max(-240, Math.min(240, o.y + dy));
+    }
+
+    _applyDragPhysics() {
+        const c = this.model?.internalModel?.coreModel;
+        if (!c) return;
+        const o = this._dragOffset || (this._dragOffset = { x: 0, y: 0 });
+        // 静止时位移自然衰减，头发随之飘回原位
+        o.x *= 0.93; o.y *= 0.93;
+        const tx = Math.max(-10, Math.min(10, -o.x / 24));
+        this._px = (this._px ?? 0) + (tx - this._px) * 0.15;
+        if (Math.abs(this._px) < 0.005) { this._px = 0; return; }
+        c.setParameterValueById('PositionX', this._px);
     }
 
     _scheduleSave() {
