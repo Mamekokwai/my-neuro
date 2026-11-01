@@ -268,25 +268,14 @@ class Live2DInteractionController {
             return;
         }
 
-        // physics3.json 的 Normalization：Position 满幅 ±10，Angle 满幅 ±57.3。
-        // 90px 累积位移 ≈ 满幅。
-        const px = cl(a.x / 26, 10);
-        const py = cl(a.y / 26, 10);
-        const ax = cl(a.x * 0.22, 20);
-        const ay = cl(a.y * 0.22, 20);
-
-        // 头部
-        c.setParameterValueById('AngleX', cl(ax * 0.5, 1) * 57);
-        c.setParameterValueById('AngleY', cl(ay * 0.5, 1) * 57);
-        c.setParameterValueById('AngleZ', cl(ax * 0.6, 1) * 57);
-        // 直通通道：不走物理，跟手更快
-        c.setParameterValueById('ParamAngleX', cl(ax * 0.18, 30));
-        c.setParameterValueById('ParamAngleY', cl(ay * 0.35, 30));
-        c.setParameterValueById('ParamAngleZ', cl(ax * 0.30, 30));
-        // 身体：拖左 → 身体右倾（取反），量程 ±10
+        // 先只驱动身体链，头完全不动。
+        // 侧发/后侧发的 X 由 ParamBodyAngleRX（身体位移）和 ParamBodyAngleX 驱动，
+        // 这两条都由 PositionX/PositionZ 算出，所以摆动来自下半身而不是转头。
+        const px = cl(a.x / 14, 10);
+        const py = cl(a.y / 14, 10);
         c.setParameterValueById('PositionX', px);
-        c.setParameterValueById('PositionY', cl(py * 0.8, 10));
-        c.setParameterValueById('PositionZ', cl(px * 0.5, 10));
+        c.setParameterValueById('PositionY', cl(py * 0.6, 10));
+        c.setParameterValueById('PositionZ', cl(px * 0.6, 10));
         c.setParameterValueById('LeanInput', cl(px * 0.8, 10));
     }
 
