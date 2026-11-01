@@ -229,14 +229,14 @@ class Live2DInteractionController {
 
     // 聊天框拖拽（保持旧行为：按住聊天框背景/消息区可拖动聊天框）
     _injectDragMotion(dx, dy) {
-        // 只负责测速：把 pointermove 的位移换成速度并低通。
-        // 加速度、弹簧积分都在 _applyDragParams 里按帧算。
+        // 只测速：pointermove 位移换算成速度并低通。加速度/弹簧都在 _applyDragParams 里按帧积分。
         const now = performance.now();
         const dt = Math.max(now - (this._lastMoveT || now), 8) / 1000;
         this._lastMoveT = now;
+        const VS = this._tune?.v_smooth ?? 0.45;
         const v = this._v || (this._v = { x: 0, y: 0 });
-        v.x += (dx / dt - v.x) * 0.45;
-        v.y += (dy / dt - v.y) * 0.45;
+        v.x += (dx / dt - v.x) * VS;
+        v.y += (dy / dt - v.y) * VS;
     }
 
     _ensureMotionLoop() {
@@ -248,6 +248,58 @@ class Live2DInteractionController {
             im.on('afterMotionUpdate', () => this._applyDragParams());
             this._motionHookBound = true;
         }
+    }
+
+    _applyDragParams() {
+        const c = this.model?.internalModel?.coreModel;
+        if (!c) return;
+        const cl = (v, lim) => Math.max(-lim, Math.min(lim, v));
+
+        this._pollTuner();
+        const T = this._tune || {};
+        const FORCE = T.force ?? 8000;
+        const ACC_REF = T.acc_ref ?? 4500;
+        const SPRING = T.spring ?? 300;
+        const DAMP = T.damp ?? 90;
+        const GAIN = T.gain ?? 0.4;
+        const CLAMP = T.clamp ?? 45;
+        const ACC_S = T.acc_smooth ?? 0.35;
+        const VDECAY = T.vel_decay ?? 0.55;
+        const EPS = T.rest_eps ?? 0.05;
+        const MAX_DT = (T.max_dt ?? 50) / 1000;
+
+        const now = performance.now();
+        const dt = Math.min(Math.max((now - (this._lastFrameT || now)) / 1000, 0.001), MAX_DT);
+        this._lastFrameT = now;
+
+        const v = this._v || (this._v = { x: 0, y: 0 });
+        if (!this.isDragging) { v.x *= VDECAY; v.y *= VDECAY; }
+
+        const prev = this._prevV || (this._prevV = { x: 0, y: 0 });
+        const acc = this._acc || (this._acc = { x: 0, y: 0 });
+        acc.x += ((v.x - prev.x) / dt - acc.x) * ACC_S;
+        acc.y += ((v.y - prev.y) / dt - acc.y) * ACC_S;
+        prev.x = v.x; prev.y = v.y;
+
+        // 弹簧-阻尼：外力来自加速度；加速度为 0 时只剩弹簧回正
+        const sk = this._spring || (this._spring = { x: 0, y: 0, vx: 0, vy: 0 });
+        const fx = Math.tanh(acc.x / ACC_REF) * FORCE;
+        const fy = Math.tanh(acc.y / ACC_REF) * FORCE;
+
+        sk.vx += (fx - SPRING * sk.x - DAMP * sk.vx) * dt;
+        sk.vy += (fy - SPRING * sk.y - DAMP * sk.vy) * dt;
+        sk.x = cl(sk.x + sk.vx * dt, CLAMP);
+        sk.y = cl(sk.y + sk.vy * dt, CLAMP);
+
+        const rest = Math.abs(sk.x) < EPS && Math.abs(sk.y) < EPS &&
+                     Math.abs(sk.vx) < EPS && Math.abs(sk.vy) < EPS && !this.isDragging;
+        if (rest) { sk.x = 0; sk.y = 0; sk.vx = 0; sk.vy = 0; return; }
+
+        // 只写 PositionX：physics3 已把头发链输入改到它身上，身体链旁路到常量
+        c.setParameterValueById('PositionX', cl(-sk.x / GAIN, 10));
+        c.setParameterValueById('PositionY', 0);
+        c.setParameterValueById('PositionZ', 0);
+        try { c.setParameterValueById('LeanInput', 0); } catch (e) {}
     }
 
     _pollTuner() {
