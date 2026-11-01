@@ -229,32 +229,16 @@ class Live2DInteractionController {
 
     // 聊天框拖拽（保持旧行为：按住聊天框背景/消息区可拖动聊天框）
     _injectDragMotion(dx, dy) {
-        // 窗口拖拽本身不会让模型"感觉到"运动，物理演算只看参数。
-        // 这里把窗口位移换算成头部/胸腔的角度偏移注入进去，物理层自然产生滞后摆动。
-        const now = performance.now();
-        const dt = Math.max(now - (this._lastDragT || now), 8);
-        this._lastDragT = now;
-        const vx = (dx / dt) * 1000;
-        const vy = (dy / dt) * 1000;
-
-        const SPEED_REF = 700;    // px/s 达到满幅，再快就限幅
-        const TARGET_MAX = 45;    // 内部角度幅度，下面各轴再按量程缩放
-        const nx = Math.max(-1, Math.min(1, vx / SPEED_REF));
-        const ny = Math.max(-1, Math.min(1, -vy / SPEED_REF));
-        // 瞬时速度抖动大，先做一层低通再当目标值（0.22 越小越绵）
-        const vt = { x: nx * TARGET_MAX, y: ny * TARGET_MAX };
-        this._vSmooth = this._vSmooth || { x: 0, y: 0 };
-        this._vSmooth.x += (vt.x - this._vSmooth.x) * 0.22;
-        this._vSmooth.y += (vt.y - this._vSmooth.y) * 0.22;
-        this._dragAngleTarget = { x: this._vSmooth.x, y: this._vSmooth.y };
-        this._ensureMotionLoop();
+        // VTS 的手感来自"模型在屏幕上的位移"持续喂给 PositionX/Y/Z，
+        // 而不是瞬时速度。这里累积拖拽位移，拖多久积多少，松手后再衰减。
+        const o = this._dragOffset || (this._dragOffset = { x: 0, y: 0 });
+        o.x = Math.max(-90, Math.min(90, o.x + dx * 0.6));
+        o.y = Math.max(-90, Math.min(90, o.y + dy * 0.6));
     }
 
     _ensureMotionLoop() {
-        // IDLE 动作每帧都会把 ParamAngleX / ParamBodyAngleX 写回默认值，
-        // 用 requestAnimationFrame 抢不过它。改挂到 afterMotionUpdate：
-        // 该事件在 motion.update() 之后、physics 之前触发，写入的数值既能躲开覆盖，
-        // 又能被物理演算当成输入。
+        // IDLE 动作每帧把 ParamAngleX / ParamBodyAngleX 写回默认值，rAF 抢不过它。
+        // 挂到 afterMotionUpdate：motion 之后、physics 之前，写入既能存活又成为物理输入。
         const im = this.model?.internalModel;
         if (!im) return;
         if (!this._motionHookBound) {
@@ -267,43 +251,43 @@ class Live2DInteractionController {
         const c = this.model?.internalModel?.coreModel;
         if (!c) return;
 
-        const t = this._dragAngleTarget || { x: 0, y: 0 };
-        const k = this.isDragging ? 0.16 : 0.05;
-        this._dragAngle = this._dragAngle || { x: 0, y: 0 };
-        this._dragAngle.x += (t.x - this._dragAngle.x) * k;
-        this._dragAngle.y += (t.y - this._dragAngle.y) * k;
-
-        const ax = this._dragAngle.x;
-        const ay = this._dragAngle.y;
-        if (!this.isDragging && Math.abs(ax) < 0.02 && Math.abs(ay) < 0.02) return;
-
+        const o = this._dragOffset || (this._dragOffset = { x: 0, y: 0 });
+        const a = this._dragAngle || (this._dragAngle = { x: 0, y: 0 });
         const cl = (v, lim) => Math.max(-lim, Math.min(lim, v));
-        // 该模型的物理链：AngleX/Y/Z → 头部；PositionX/Y/Z → 身体(ParamBodyAngleX)
-        // / 胯(HipAngleX) / 胸部。ParamBodyAngleX 等是物理的输出，直接写会被覆盖，
-        // 所以只喂物理的输入参数。
-        const nx = ax / 45;   // 归一化到 [-1, 1]
-        const ny = ay / 45;
 
-        // 头部（Angle 系列）
-        // Y：向下拖 → 抬头，Z：向左拖 → 向右歪头，两者方向都与原始位移相反
-        // 抬头低头（pitch）是主手感通道，权重给足；并且直写 ParamAngleY，
-        // 和 ParamAngleZ 一样走"不经过物理"的直通路径，跟手更明显。
-        c.setParameterValueById('AngleX', cl(nx * 1.0, 1) * 18);
-        c.setParameterValueById('AngleY', cl(-ny * 1.0, 1) * 28);
-        c.setParameterValueById('AngleZ', cl(-nx * 1.5, 1) * 10);
-        c.setParameterValueById('ParamAngleY', cl(-ay * 0.70, 30));
-        c.setParameterValueById('ParamAngleZ', cl(-ax * 0.55, 30));
+        // 位移衰减：拖拽中也轻微衰减形成拖尾，松手后快速回位
+        const decay = this.isDragging ? 0.96 : 0.90;
+        o.x *= decay; o.y *= decay;
+
+        // 平滑跟随（系数越小越绵）
+        a.x += (-o.x - a.x) * 0.18;
+        a.y += (-o.y - a.y) * 0.18;
+
+        if (!this.isDragging && Math.abs(a.x) < 0.05 && Math.abs(a.y) < 0.05) {
+            o.x = 0; o.y = 0; a.x = 0; a.y = 0;
+            return;
+        }
+
+        // physics3.json 的 Normalization：Position 满幅 ±10，Angle 满幅 ±57.3。
+        // 90px 累积位移 ≈ 满幅。
+        const px = cl(a.x / 9, 10);
+        const py = cl(a.y / 9, 10);
+        const ax = cl(a.x * 0.45, 30);
+        const ay = cl(a.y * 0.45, 30);
+
+        // 头部
+        c.setParameterValueById('AngleX', cl(ax * 0.6, 1) * 57);
+        c.setParameterValueById('AngleY', cl(ay * 0.6, 1) * 57);
+        c.setParameterValueById('AngleZ', cl(ax * 1.0, 1) * 57);
+        // 直通通道：不走物理，跟手更快
         c.setParameterValueById('ParamAngleX', cl(ax * 0.35, 30));
-
-        // 身体一级部位全靠这四条纯输入往下游传导：
-        // PositionX → 身体偏转/胯/胸/丝带；PositionY → 胸/肩/胯Y；
-        // PositionZ → 胯/腿/丝带；LeanInput → 胸/肩/腰。
-        // 量程按 ±8 试（自定义参数常常不是 ±1，之前给 1 可能只用到一成）。
-        const BODY_SCALE = 8;
-        c.setParameterValueById('PositionX', cl(-nx * BODY_SCALE, BODY_SCALE));
-        c.setParameterValueById('PositionY', cl(ny * BODY_SCALE, BODY_SCALE));
-        c.setParameterValueById('PositionZ', cl(-nx * BODY_SCALE * 0.6, BODY_SCALE));
-        c.setParameterValueById('LeanInput', cl(-nx * BODY_SCALE, BODY_SCALE));
+        c.setParameterValueById('ParamAngleY', cl(ay * 0.55, 30));
+        c.setParameterValueById('ParamAngleZ', cl(ax * 0.55, 30));
+        // 身体：拖左 → 身体右倾（取反），量程 ±10
+        c.setParameterValueById('PositionX', px);
+        c.setParameterValueById('PositionY', cl(py * 0.8, 10));
+        c.setParameterValueById('PositionZ', cl(px * 0.5, 10));
+        c.setParameterValueById('LeanInput', cl(px * 0.8, 10));
     }
 
     _setupChatDrag() {
