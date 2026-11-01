@@ -280,10 +280,11 @@ class Live2DInteractionController {
         const ny = ay / 45;
 
         // 头部（Angle 系列）
+        // Y：向下拖 → 抬头，Z：向左拖 → 向右歪头，两者方向都与原始位移相反
         c.setParameterValueById('AngleX', cl(nx * 1.0, 1) * 10);
-        c.setParameterValueById('AngleY', cl(ny * 1.0, 1) * 10);
-        c.setParameterValueById('AngleZ', cl(nx * 1.5, 1) * 10);
-        c.setParameterValueById('ParamAngleZ', cl(ax * 0.55, 30));  // 已验证有效，保留
+        c.setParameterValueById('AngleY', cl(-ny * 1.0, 1) * 10);
+        c.setParameterValueById('AngleZ', cl(-nx * 1.5, 1) * 10);
+        c.setParameterValueById('ParamAngleZ', cl(-ax * 0.55, 30));
 
         // 身体：拖左 → 身体右倾（取反）
         c.setParameterValueById('PositionX', cl(-nx, 1));
