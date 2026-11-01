@@ -287,11 +287,11 @@ class Live2DInteractionController {
         // 弹簧-阻尼：外力来自加速度，加速度为 0 时只剩弹簧把位移拉回 0
         this._pollTuner();
         const T = this._tune || {};
-        const FORCE = T.force ?? 2600;      // 加速度满值对应的驱动力
-        const ACC_REF = T.acc_ref ?? 20000; // 认为"满加速"的量级
-        const SPRING = T.spring ?? 70;      // 回正刚度
-        const DAMP = T.damp ?? 13;          // 阻尼
-        const GAIN = T.gain ?? 1.2;         // 输出增益，越小越早打满
+        const FORCE = T.force ?? 8000;      // 加速度满值对应的驱动力
+        const ACC_REF = T.acc_ref ?? 4500; // 认为"满加速"的量级
+        const SPRING = T.spring ?? 300;      // 回正刚度
+        const DAMP = T.damp ?? 90;          // 阻尼
+        const GAIN = T.gain ?? 0.4;         // 输出增益，越小越早打满
 
         const sk = this._spring || (this._spring = { x: 0, y: 0, vx: 0, vy: 0 });
         const fx = Math.tanh(acc.x / ACC_REF) * FORCE;
