@@ -34,7 +34,7 @@ let runtimeLogLength = 0;
 let runtimeLogRemainder = '';
 let controlWindow = null;
 
-// 🔥 单实例锁：反复双击 肥牛.exe 之前会一直开新窗口/新进程，
+// 🔥 单实例锁：反复双击 肥鱼.exe 之前会一直开新窗口/新进程，
 // 拿不到锁就直接退出，并把已有窗口拉到前台。
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -457,7 +457,7 @@ function listPlugins() {
     'check-in': '定时问候',
     'txt-writer': '文本写入',
     'minimax-music': 'MiniMax 音乐生成',
-    'feiniu-board-game': '肥牛棋盘游戏',
+    'feiniu-board-game': '肥鱼棋盘游戏',
     'kimi-search': 'Kimi 联网搜索',
     'agent-dream': '梦境系统',
     'qq-connect': 'QQ 连接',

@@ -259,33 +259,33 @@
             
             <!-- 云端配置子选项卡 -->
             <div class="sub-tabs">
-                <button class="sub-tab-button active" onclick="switchCloudTab('gateway')" data-i18n="cloud_config.gateway_tab">云端肥牛</button>
+                <button class="sub-tab-button active" onclick="switchCloudTab('gateway')" data-i18n="cloud_config.gateway_tab">云端肥鱼</button>
                 <button class="sub-tab-button" onclick="switchCloudTab('tts')" data-i18n="cloud_config.tts_tab">云端 TTS</button>
                 <button class="sub-tab-button" onclick="switchCloudTab('aliyun')" data-i18n="cloud_config.aliyun_tab">阿里云 TTS</button>
                 <button class="sub-tab-button" onclick="switchCloudTab('baidu')" data-i18n="cloud_config.baidu_tab">百度流式 ASR</button>
             </div>
             
-            <!-- 云端肥牛面板 -->
+            <!-- 云端肥鱼面板 -->
             <div id="gateway-panel" class="cloud-panel active">
                 <div class="section">
-                    <h4 data-i18n="cloud_config.gateway_title">🐂 云端肥牛配置</h4>
+                    <h4 data-i18n="cloud_config.gateway_title">🐂 云端肥鱼配置</h4>
                     <div class="checkbox-group">
                         <input type="checkbox" id="gateway-enabled">
                         <label for="gateway-enabled" data-i18n="cloud_config.gateway_enabled">启动全云端</label>
                     </div>
                     <div class="form-group">
-                        <label for="gateway-base-url" data-i18n="cloud_config.gateway_url">肥牛 URL：</label>
+                        <label for="gateway-base-url" data-i18n="cloud_config.gateway_url">肥鱼 URL：</label>
                         <input type="text" id="gateway-base-url" data-i18n-placeholder="cloud_config.gateway_url_placeholder" placeholder="例如：http://ominifn.natapp1.cc/api/v1">
                     </div>
                     <div class="form-group">
-                        <label for="gateway-api-key" data-i18n="cloud_config.gateway_key">肥牛密钥：</label>
+                        <label for="gateway-api-key" data-i18n="cloud_config.gateway_key">肥鱼密钥：</label>
                         <div style="display: flex; gap: 10px;">
-                            <input type="password" id="gateway-api-key" data-i18n-placeholder="cloud_config.gateway_key_placeholder" placeholder="输入肥牛密钥" style="flex: 1;">
+                            <input type="password" id="gateway-api-key" data-i18n-placeholder="cloud_config.gateway_key_placeholder" placeholder="输入肥鱼密钥" style="flex: 1;">
                             <button type="button" onclick="togglePasswordVisibility('gateway-api-key')" style="width: 40px;">👁️</button>
                         </div>
                     </div>
                     <div class="info-tip" data-i18n="cloud_config.gateway_tip">
-                        💡 提示：启动就能用！语音识别、语音合成、智能对话这些功能全在云端跑，你的电脑上不用装任何东西。不管是 Windows 还是 Mac、Linux，只要能上网就行。点击下方的按键前往肥牛官网注册登录后。选择肥牛 API 密钥，在那即可获取到肥牛的 API KEY
+                        💡 提示：启动就能用！语音识别、语音合成、智能对话这些功能全在云端跑，你的电脑上不用装任何东西。不管是 Windows 还是 Mac、Linux，只要能上网就行。点击下方的按键前往肥鱼官网注册登录后。选择肥鱼 API 密钥，在那即可获取到肥鱼的 API KEY
                     </div>
                 </div>
             </div>
@@ -395,7 +395,7 @@
                 </div>
             </div>
             <div class="config-save-bar">
-                <button class="btn-start" onclick="openGatewayWebsite()" style="margin-right: auto;" data-i18n="cloud_config.gateway_website">🔗 前往云端肥牛官网</button>
+                <button class="btn-start" onclick="openGatewayWebsite()" style="margin-right: auto;" data-i18n="cloud_config.gateway_website">🔗 前往云端肥鱼官网</button>
                 <button class="config-save-button" onclick="saveCloudSettings()" data-i18n="common.save_config">保存配置</button>
             </div>
         </div>

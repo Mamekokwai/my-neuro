@@ -2655,7 +2655,7 @@ async function saveCloudSettings() {
             appkey: document.getElementById('baidu-asr-appkey').value,
             dev_pid: parseInt(document.getElementById('baidu-asr-devpid').value) || 0
         },
-        // 云端肥牛网关配置
+        // 云端肥鱼网关配置
         api_gateway: {
             use_gateway: document.getElementById('gateway-enabled').checked,
             base_url: document.getElementById('gateway-base-url').value,
@@ -2690,7 +2690,7 @@ async function loadCloudSettings() {
         if (response.ok) {
             const data = await response.json();
 
-            // 云端肥牛配置
+            // 云端肥鱼配置
             const gateway = data.api_gateway || {};
             document.getElementById('gateway-enabled').checked = gateway.use_gateway === true;
             document.getElementById('gateway-base-url').value = gateway.base_url || '';
@@ -2738,7 +2738,7 @@ async function loadCloudSettings() {
     }
 }
 
-// 打开云端肥牛官网
+// 打开云端肥鱼官网
 function openGatewayWebsite() {
     window.open('http://mynewbot.com', '_blank');
 }
@@ -3841,7 +3841,7 @@ async function openPluginPanel(pluginPath) {
             } else {
                 window.open(url, '_blank', 'noopener,noreferrer');
             }
-            const panelLabel = result.panel_kind === 'feiniu-house' ? '肥牛小屋' : '人格导演面板';
+            const panelLabel = result.panel_kind === 'feiniu-house' ? '肥鱼小屋' : '人格导演面板';
             addLog(result.available
                 ? `已打开${panelLabel}：${url}`
                 : `已打开${panelLabel}地址，但当前未探测到运行状态：${url}`,

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, nativeImage } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const { spawn, spawnSync } = require('child_process')
 const { HttpServer } = require('./js/services/http-server')
 const {
     scanLive2DModels,
@@ -25,6 +26,30 @@ const configPath = process.env.MY_NEURO_CONFIG_PATH
 const configBaseDir = path.dirname(configPath);
 const { persistProviderStore } = require('./js/core/llm-provider-store');
 let shortcutManager = null;
+let localAsrProcess = null;
+
+function startLocalAsr(configData) {
+    if (configData.asr?.local_streaming?.enabled !== true) return;
+    const python = path.join(app.getAppPath(), '.venv-asr', 'Scripts', 'python.exe');
+    const server = path.join(app.getAppPath(), 'js', 'voice', 'local-asr-server.py');
+    if (!fs.existsSync(python) || !fs.existsSync(server)) {
+        logToTerminal('error', '本地流式ASR环境缺失');
+        return;
+    }
+    localAsrProcess = spawn(python, [server], {
+        cwd: path.dirname(server),
+        windowsHide: true,
+        env: { ...process.env, PYTHONUTF8: '1' },
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+    localAsrProcess.stdout.on('data', data => console.log(String(data).trim()));
+    localAsrProcess.stderr.on('data', data => console.log(String(data).trim()));
+    localAsrProcess.on('error', error => logToTerminal('error', `本地流式ASR启动失败: ${error.message}`));
+    localAsrProcess.on('exit', code => {
+        if (code !== null && code !== 0) logToTerminal('error', `本地流式ASR退出: ${code}`);
+        localAsrProcess = null;
+    });
+}
 let rendererRequestCounter = 0;
 const pendingRendererRequests = new Map();
 let avatarSwitchTransaction = null;
@@ -512,6 +537,7 @@ app.whenReady().then(() => {
     }
 
     normalizeConfiguredAvatarType(configData);
+    startLocalAsr(configData);
 
     const mainWindow = createWindow();
 
@@ -535,6 +561,14 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
+    if (localAsrProcess?.pid) {
+        if (process.platform === 'win32') {
+            spawnSync('taskkill.exe', ['/PID', String(localAsrProcess.pid), '/T', '/F'], { windowsHide: true });
+        } else {
+            localAsrProcess.kill();
+        }
+    }
+    localAsrProcess = null;
     avatarSwitchTransaction?.dispose();
     avatarSwitchTransaction = null;
     if (shortcutManager) {
