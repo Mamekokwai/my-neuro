@@ -290,12 +290,14 @@ class Live2DInteractionController {
         if (rest) { sk.x = 0; sk.y = 0; sk.vx = 0; sk.vy = 0; return; }
 
         // 只驱动身体链（头不转）：PositionX/Y/Z + LeanInput 满幅 ±10
-        const px = cl(-sk.x / 2, 10);
-        const py = cl(-sk.y / 2, 10);
-        c.setParameterValueById('PositionX', px);
-        c.setParameterValueById('PositionY', cl(py * 0.6, 10));
-        c.setParameterValueById('PositionZ', cl(px * 0.6, 10));
-        c.setParameterValueById('LeanInput', cl(px * 0.8, 10));
+        // 只写 PositionX：physics3.json 已把头发链的输入改到它身上，
+        // 身体链的输入被改到永不写入的常量上，因此只有头发会动。
+        c.setParameterValueById('PositionX', cl(-sk.x / 2, 10));
+        c.setParameterValueById('PositionY', 0);
+        c.setParameterValueById('PositionZ', 0);
+        if (typeof c.setParameterValueById === 'function') {
+            try { c.setParameterValueById('LeanInput', 0); } catch (e) {}
+        }
     }
 
     _setupChatDrag() {
