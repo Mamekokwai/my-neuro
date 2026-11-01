@@ -152,7 +152,7 @@ class InputRouter {
         const chatMessages = document.getElementById('chat-messages');
         if (chatMessages) {
             const messageElement = document.createElement('div');
-            messageElement.innerHTML = `<strong>${role === 'user' ? '你' : 'Fake Neuro'}:</strong> ${content}`;
+            messageElement.innerHTML = `<strong>${role === 'user' ? '你' : '肥鱼'}:</strong> ${content}`;
             chatMessages.appendChild(messageElement);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -167,7 +167,7 @@ class InputRouter {
         const lastAIMsg = messages.filter(m => m.role === 'assistant').pop();
 
         if (lastUserMsg && lastAIMsg) {
-            const newContent = `【用户】: ${lastUserMsg.content}\n【Fake Neuro】: ${lastAIMsg.content}\n`;
+            const newContent = `【用户】: ${lastUserMsg.content}\n【肥鱼】: ${lastAIMsg.content}\n`;
 
             try {
                 fs.appendFileSync(

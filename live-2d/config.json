@@ -134,7 +134,7 @@
     "model_type": "live2d",
     "vrm_model": "",
     "vrm_model_path": "",
-    "model_scale": 0.808662440063414,
+    "model_scale": 0.550362068779474,
     "show_chat_box": false,
     "show_model": true,
     "text_only_mode": false,
@@ -143,8 +143,8 @@
     "model_position": {
       "x": 0.5483040683903566,
       "y": 0.2473080231342701,
-      "x_dual": -0.046599651298895706,
-      "y_dual": 0.16991771908392095,
+      "x_dual": 0.008749971389770508,
+      "y_dual": 0.019599994045350608,
       "remember_position": true,
       "bounce_back": true,
       "display": {
@@ -183,7 +183,7 @@
   "subtitle_labels": {
     "enabled": true,
     "user": "用户",
-    "ai": "fake neuro"
+    "ai": "肥鱼"
   },
   "auto_close_services": {
     "enabled": false

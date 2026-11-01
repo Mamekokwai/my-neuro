@@ -47,7 +47,7 @@ class AppInitializer {
         const baiduASREnabled = config.cloud?.baidu_asr?.enabled === true;
         const siliconflowASREnabled = config.cloud?.siliconflow_asr?.enabled === true;
         this.asrEnabled = localASREnabled || baiduASREnabled || siliconflowASREnabled;
-        this.INTRO_TEXT = config.ui.intro_text || "你好，我叫fake neuro。";
+        this.INTRO_TEXT = config.ui.intro_text || "你好，我叫肥鱼。";
     }
 
     // 主初始化流程
@@ -312,7 +312,7 @@ class AppInitializer {
         } else {
             // 如果TTS禁用，显示欢迎语3秒后自动消失
             setTimeout(() => {
-                this.uiController.showSubtitle(`Fake Neuro: ${this.INTRO_TEXT}`, 3000);
+                this.uiController.showSubtitle(`肥鱼: ${this.INTRO_TEXT}`, 3000);
             }, 1000);
         }
 

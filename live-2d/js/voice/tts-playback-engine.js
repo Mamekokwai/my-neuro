@@ -208,7 +208,7 @@ class TTSPlaybackEngine {
                             // 显示字幕
                             const currentDisplay = this.displayedText + processedText.substring(0, charDisplayIndex);
                             if (typeof showSubtitle === 'function') {
-                                showSubtitle(`${this.config.subtitle_labels?.ai || 'Fake Neuro'}: ${currentDisplay}`);
+                                showSubtitle(`${this.config.subtitle_labels?.ai || '肥鱼'}: ${currentDisplay}`);
                                 const container = document.getElementById('subtitle-container');
                                 if (container) container.scrollTop = container.scrollHeight;
                             }
@@ -365,7 +365,7 @@ class TTSPlaybackEngine {
                 // 更新显示文本
                 this.displayedText += processedText;
                 if (typeof showSubtitle === 'function') {
-                    showSubtitle(`${this.config.subtitle_labels?.ai || 'Fake Neuro'}: ${this.displayedText}`);
+                    showSubtitle(`${this.config.subtitle_labels?.ai || '肥鱼'}: ${this.displayedText}`);
                 }
 
                 this.cleanup();

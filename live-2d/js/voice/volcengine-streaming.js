@@ -369,7 +369,7 @@ class VolcengineStreamingSession {
     }
 
     _showSubtitle(text) {
-        const label = this.config.subtitle_labels?.ai || 'Fake Neuro';
+        const label = this.config.subtitle_labels?.ai || '肥鱼';
         if (typeof showSubtitle === 'function') {
             showSubtitle(`${label}: ${text}`);
             const container = document.getElementById('subtitle-container');

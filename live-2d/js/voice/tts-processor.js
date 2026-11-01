@@ -209,7 +209,7 @@ class EnhancedTextProcessor {
 
     // 打字机动画：从队列中逐字消费
     startFallbackTypewriter() {
-        const label = this.config.subtitle_labels?.ai || 'Fake Neuro';
+        const label = this.config.subtitle_labels?.ai || '肥鱼';
         const charInterval = 180; // 180ms一个字
 
         const typeNext = () => {
@@ -320,7 +320,7 @@ class EnhancedTextProcessor {
         if (chatMessages) {
             const messageElement = document.createElement('div');
             const label = document.createElement('strong');
-            label.textContent = 'Fake Neuro:';
+            label.textContent = '肥鱼:';
             messageElement.append(label, document.createTextNode(` ${cleanDisplayText(this.llmFullResponse)}`));
             chatMessages.appendChild(messageElement);
             chatMessages.scrollTop = chatMessages.scrollHeight;

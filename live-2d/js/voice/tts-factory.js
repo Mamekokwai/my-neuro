@@ -18,7 +18,7 @@ function appendAiMessage(container, text) {
     if (!container || !text) return;
     const messageElement = document.createElement('div');
     const label = document.createElement('strong');
-    label.textContent = 'Fake Neuro:';
+    label.textContent = '肥鱼:';
     messageElement.append(label, document.createTextNode(` ${text}`));
     container.appendChild(messageElement);
     container.scrollTop = container.scrollHeight;
@@ -67,7 +67,7 @@ class TTSFactory {
                     // 直接显示文本，不进行语音合成
                     const displayText = cleanDisplayText(text);
                     textMouth.push(displayText);
-                    uiController.showSubtitle(`Fake Neuro: ${displayText}`, 3000);
+                    uiController.showSubtitle(`肥鱼: ${displayText}`, 3000);
 
                     // 添加到聊天记录
                     const chatMessages = document.getElementById('chat-messages');
@@ -91,13 +91,13 @@ class TTSFactory {
                     const previousText = cleanDisplayText(virtualTTS.accumulatedText);
                     virtualTTS.accumulatedText += text;
                     textMouth.push(cleanDisplayText(virtualTTS.accumulatedText).slice(previousText.length));
-                    uiController.showSubtitle(`Fake Neuro: ${cleanDisplayText(virtualTTS.accumulatedText)}`, 3000);
+                    uiController.showSubtitle(`肥鱼: ${cleanDisplayText(virtualTTS.accumulatedText)}`, 3000);
                 },
                 finalizeStreamingText: () => {
                     if (virtualTTS.accumulatedText) {
                         const displayText = cleanDisplayText(virtualTTS.accumulatedText);
                         // 最终确保字幕会在3秒后消失
-                        uiController.showSubtitle(`Fake Neuro: ${displayText}`, 3000);
+                        uiController.showSubtitle(`肥鱼: ${displayText}`, 3000);
 
                         // 添加到聊天记录
                         const chatMessages = document.getElementById('chat-messages');
