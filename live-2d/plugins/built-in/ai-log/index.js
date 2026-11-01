@@ -85,7 +85,7 @@ class AiLogPlugin extends Plugin {
                 type: 'function',
                 function: {
                     name: 'write_monthly_summary',
-                    description: '每月1号调用此工具生成上个月的月度总结。这个工具会读取上个月的所有AI日志，生成一份肥牛视角的月度观察报告。',
+                    description: '每月1号调用此工具生成上个月的月度总结。这个工具会读取上个月的所有AI日志，生成一份肥鱼视角的月度观察报告。',
                     parameters: {
                         type: 'object',
                         properties: {},

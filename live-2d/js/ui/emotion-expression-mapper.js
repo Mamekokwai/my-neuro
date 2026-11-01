@@ -97,7 +97,7 @@ class EmotionExpressionMapper {
                 const modelPath = this.model.internalModel.settings.url || '';
                 console.log('模型路径:', modelPath);
 
-                // 从 "2D/肥牛/xxx.model3.json" 提取 "肥牛"
+                // 从 "2D/肥鱼/xxx.model3.json" 提取 "肥鱼"
                 const match = modelPath.match(/2D\/([^\/]+)\//);
                 if (match) {
                     const characterName = match[1];
@@ -106,17 +106,17 @@ class EmotionExpressionMapper {
                 }
             }
 
-            return "肥牛";
+            return "肥鱼";
         } catch (error) {
             console.error('获取角色名失败:', error);
-            return "肥牛";
+            return "肥鱼";
         }
     }
 
     // 从模型路径中提取角色名称
     extractCharacterFromPath(modelPath) {
         try {
-            // 假设路径格式类似: "2D/肥牛/hiyori_pro_mic.model3.json"
+            // 假设路径格式类似: "2D/肥鱼/hiyori_pro_mic.model3.json"
             const pathParts = modelPath.split('/');
             if (pathParts.length >= 2 && pathParts[0] === '2D') {
                 return pathParts[1]; // 返回角色文件夹名称
@@ -125,7 +125,7 @@ class EmotionExpressionMapper {
             // 备选方案：从文件名推断
             const fileName = pathParts[pathParts.length - 1];
             if (fileName && fileName.includes('hiyori')) {
-                return "肥牛";
+                return "肥鱼";
             }
             if (fileName && fileName.includes('mgirl')) {
                 return "橘色女生";

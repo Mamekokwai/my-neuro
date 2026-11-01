@@ -1,7 +1,7 @@
 {
   "time-awareness": {
     "display_name": "time-awareness",
-    "desc": "肥牛会注意到时间，在特定时段主动开口",
+    "desc": "肥鱼会注意到时间，在特定时段主动开口",
     "author": "xxxiu",
     "repo": "https://github.com/morettt/time-awareness"
   },
@@ -157,7 +157,7 @@
   },
   "qq-connect": {
     "display_name": "qq-connect",
-    "desc": "通过 OneBot 11 协议（推荐 LLBot / LLOneBot）把肥牛桥接到 QQ：admin 私聊与电脑端语音共享同一份带压缩、可持久化的主上下文（voiceChat.messages），群聊与陌生人走独立会话不污染电脑端；三级用户权限（admin / trusted / normal）+ 三级群权限（trusted / open / normal）；admin 可通过 Function Calling 调用 my-neuro 当前所有已启用插件暴露工具的并集（含本插件自带 12 个：文件读写/重命名/列目录/系统命令/桌面 TTS/Live2D 表情/QQ 主动外发/状态查询）；按 key 分桶限流（stall / discard）；合并转发自动展开与外发；长回复可按句号分段；MemOS 集成自动注入记忆与回写。零 npm 运行时依赖。README 含 LLBot 从下载、扫码登录到配置 OneBot 11 正向 WS 的完整教程，并专章说明 admin 工具能力的攻击面放大场景与缓解措施（不需要工具时设 enable_agent_tools=false）。仓库已脱敏：token / trusted_users / 真实 QQ 号全部清空。",
+    "desc": "通过 OneBot 11 协议（推荐 LLBot / LLOneBot）把肥鱼桥接到 QQ：admin 私聊与电脑端语音共享同一份带压缩、可持久化的主上下文（voiceChat.messages），群聊与陌生人走独立会话不污染电脑端；三级用户权限（admin / trusted / normal）+ 三级群权限（trusted / open / normal）；admin 可通过 Function Calling 调用 my-neuro 当前所有已启用插件暴露工具的并集（含本插件自带 12 个：文件读写/重命名/列目录/系统命令/桌面 TTS/Live2D 表情/QQ 主动外发/状态查询）；按 key 分桶限流（stall / discard）；合并转发自动展开与外发；长回复可按句号分段；MemOS 集成自动注入记忆与回写。零 npm 运行时依赖。README 含 LLBot 从下载、扫码登录到配置 OneBot 11 正向 WS 的完整教程，并专章说明 admin 工具能力的攻击面放大场景与缓解措施（不需要工具时设 enable_agent_tools=false）。仓库已脱敏：token / trusted_users / 真实 QQ 号全部清空。",
     "author": "爱熬夜的人形兔",
     "repo": "https://github.com/A-night-owl-Rabbit/my-neuro-plugin-qq-connect"
   },
@@ -175,13 +175,13 @@
   },
   "feiniu-draw-guess": {
     "display_name": "feiniu-draw-guess",
-    "desc": "你画我猜小游戏插件：内置本地网页（默认浏览器打开），支持「AI 画你猜」与「玩家画肥牛猜」两种模式；AI 画画通过笔画协议生成并用 p5.brush 渲染手绘风，笔画失败时可选用生图模型兜底；带倒计时、计分板、揭晓动画和 OBS 展示页；对局状态可存档恢复。无需额外依赖，复制到 live-2d/plugins/community/ 即可使用，需自行在控制中心配置 LLM 供应商与模型，肥牛的人设提示词也由用户自行填写。",
+    "desc": "你画我猜小游戏插件：内置本地网页（默认浏览器打开），支持「AI 画你猜」与「玩家画肥鱼猜」两种模式；AI 画画通过笔画协议生成并用 p5.brush 渲染手绘风，笔画失败时可选用生图模型兜底；带倒计时、计分板、揭晓动画和 OBS 展示页；对局状态可存档恢复。无需额外依赖，复制到 live-2d/plugins/community/ 即可使用，需自行在控制中心配置 LLM 供应商与模型，肥鱼的人设提示词也由用户自行填写。",
     "author": "爱熬夜的人形兔",
     "repo": "https://github.com/A-night-owl-Rabbit/my-neuro-plugin-feiniu-draw-guess"
   },
   "feiniu-computer-use": {
     "display_name": "feiniu-computer-use",
-    "desc": "让肥牛看屏幕、找窗口、点击、输入、按键、滚动、拖拽，操作 Windows 桌面软件。默认完全自主控制，无需逐次询问授权；保留观察-动作-刷新、Esc 停止和动作上限，可关闭自主模式恢复按应用分级确认。内置主人让位（你在操作时自动等待）、长文本分段输入与部分完成回执、worker 重启后旧操作失效等可靠性机制。需自备 Python 环境并安装 uiautomation，按 README 配置；请勿在世界之眼中代理本插件。",
+    "desc": "让肥鱼看屏幕、找窗口、点击、输入、按键、滚动、拖拽，操作 Windows 桌面软件。默认完全自主控制，无需逐次询问授权；保留观察-动作-刷新、Esc 停止和动作上限，可关闭自主模式恢复按应用分级确认。内置主人让位（你在操作时自动等待）、长文本分段输入与部分完成回执、worker 重启后旧操作失效等可靠性机制。需自备 Python 环境并安装 uiautomation，按 README 配置；请勿在世界之眼中代理本插件。",
     "author": "爱熬夜的人形兔",
     "repo": "https://github.com/A-night-owl-Rabbit/my-neuro-plugin-feiniu-computer-use"
   }

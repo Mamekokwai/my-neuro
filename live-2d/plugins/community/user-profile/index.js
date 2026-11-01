@@ -730,7 +730,7 @@ ${JSON.stringify(candidates.map(c => ({
     // ===== Prompts =====
 
     _buildBootstrapPrompt(memories, preferences, graph) {
-        return `你是用户画像诊断器。请基于肥牛的长期记忆，为"主人"生成一份长期稳定用户画像。
+        return `你是用户画像诊断器。请基于肥鱼的长期记忆，为"主人"生成一份长期稳定用户画像。
 
 原则：
 - 只提炼长期稳定的习惯、行为模式、性格做派、稳定偏好、稳定事实和重要关系。

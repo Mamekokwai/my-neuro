@@ -308,7 +308,7 @@ class PluginManager {
     }
 
     /**
-     * 监听 enabled_plugins.json，肥牛.exe 修改后自动同步
+     * 监听 enabled_plugins.json，肥鱼.exe 修改后自动同步
      */
     _watchEnabledList() {
         const listPath = path.join(this._pluginsDir, 'enabled_plugins.json');

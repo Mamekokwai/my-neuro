@@ -74,7 +74,7 @@ class VRMSetup {
         _controller.init(model, _manager, config);
         _controller.setupInitialModelProperties();
 
-        // 4. VMC 协议发送器（肥牛独有功能，保留）
+        // 4. VMC 协议发送器（肥鱼独有功能，保留）
         const vmcConfig = config?.vmc || {};
         model.setupVMC({
             enabled: vmcConfig.enabled !== false,

@@ -33,8 +33,13 @@ class ASRProcessor {
         // 音频相关参数
         this.audioContext = null;
         this.mediaStream = null;
+        this.microphoneNode = null;
+        this.scriptNode = null;
+        this.silentSink = null;
+        this.mediaSink = null;
         this.ws = null;
         this.SAMPLE_RATE = 16000;
+        this.inputSampleRate = this.SAMPLE_RATE;
         this.WINDOW_SIZE = 512;
         this.retryCount = 0;
         this.MAX_RETRIES = 5;
@@ -217,26 +222,45 @@ class ASRProcessor {
 
     async startRecording() {
         try {
+            const inputs = (await navigator.mediaDevices.enumerateDevices())
+                .filter(device => device.kind === 'audioinput');
+            logToTerminal('info', `[ASR] 可用输入: ${inputs.map(device => device.label).join(' | ')}`);
+            const inputLabel = this.config.asr?.input_device_label || process.env.MY_NEURO_ASR_DEVICE;
+            const selectedInput = inputLabel && inputs.find(device =>
+                device.deviceId !== 'default' &&
+                device.deviceId !== 'communications' &&
+                device.label.includes(inputLabel)
+            );
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
+                    ...(selectedInput ? { deviceId: { exact: selectedInput.deviceId } } : {}),
                     channelCount: 1,
-                    sampleRate: this.SAMPLE_RATE,
-                    echoCancellation: true,
-                    noiseSuppression: true
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
                 }
             });
+            const inputTrack = this.mediaStream.getAudioTracks()[0];
+            logToTerminal('info', `[ASR] 输入设备: ${inputTrack?.label || '未知'}; ${JSON.stringify(inputTrack?.getSettings?.() || {})}`);
 
-            this.audioContext = new AudioContext({ sampleRate: this.SAMPLE_RATE });
-            const microphone = this.audioContext.createMediaStreamSource(this.mediaStream);
-            const scriptNode = this.audioContext.createScriptProcessor(this.WINDOW_SIZE, 1, 1);
+            // 使用设备原生采样率，避免强制 16 kHz 触发 Windows 音频设备重协商。
+            this.audioContext = new AudioContext();
+            this.inputSampleRate = this.audioContext.sampleRate;
+            this.microphoneNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+            this.scriptNode = this.audioContext.createScriptProcessor(this.WINDOW_SIZE, 1, 1);
+            this.silentSink = this.audioContext.createGain();
+            this.silentSink.gain.value = 0;
+            this.mediaSink = this.audioContext.createMediaStreamDestination();
 
-            microphone.connect(scriptNode);
-            scriptNode.connect(this.audioContext.destination);
+            this.microphoneNode.connect(this.scriptNode);
+            // ScriptProcessor needs a sink, but connecting even silent audio to the speakers opens a Windows playback session.
+            this.scriptNode.connect(this.silentSink);
+            this.silentSink.connect(this.mediaSink);
 
             let lastSendTime = 0;
             const MIN_SEND_INTERVAL = 1;
 
-            scriptNode.onaudioprocess = (e) => {
+            this.scriptNode.onaudioprocess = (e) => {
                 // 修改：根据语音打断配置决定音频处理逻辑
                 if (!this.voiceBargeInEnabled) {
                     // 传统模式：TTS播放时跳过音频处理
@@ -246,7 +270,8 @@ class ASRProcessor {
                 // asrLocked只用于防止新的录音识别,不影响VAD检测
 
                 const currentTime = Date.now();
-                const audioData = e.inputBuffer.getChannelData(0);
+                const inputAudioData = e.inputBuffer.getChannelData(0);
+                const audioData = this.resampleAudioData(inputAudioData, this.inputSampleRate, this.SAMPLE_RATE);
 
                 this.continuousBuffer.push(...Array.from(audioData));
 
@@ -271,9 +296,50 @@ class ASRProcessor {
         }
     }
 
+    resampleAudioData(samples, sourceRate, targetRate) {
+        if (sourceRate === targetRate) return new Float32Array(samples);
+        const outputLength = Math.max(1, Math.round(samples.length * targetRate / sourceRate));
+        const output = new Float32Array(outputLength);
+        const ratio = sourceRate / targetRate;
+        for (let i = 0; i < outputLength; i++) {
+            const position = i * ratio;
+            const left = Math.floor(position);
+            const right = Math.min(left + 1, samples.length - 1);
+            const fraction = position - left;
+            output[i] = samples[left] * (1 - fraction) + samples[right] * fraction;
+        }
+        return output;
+    }
+
     stopRecording() {
+        if (this.scriptNode) {
+            this.scriptNode.onaudioprocess = null;
+            try { this.scriptNode.disconnect(); } catch (_) {}
+            this.scriptNode = null;
+        }
+        if (this.microphoneNode) {
+            try { this.microphoneNode.disconnect(); } catch (_) {}
+            this.microphoneNode = null;
+        }
+        if (this.silentSink) {
+            try { this.silentSink.disconnect(); } catch (_) {}
+            this.silentSink = null;
+        }
+        if (this.mediaSink) {
+            try { this.mediaSink.disconnect(); } catch (_) {}
+            this.mediaSink.stream.getTracks().forEach(track => track.stop());
+            this.mediaSink = null;
+        }
         if (this.mediaStream) {
             this.mediaStream.getTracks().forEach(track => track.stop());
+            this.mediaStream = null;
+        }
+        if (this.audioContext) {
+            const context = this.audioContext;
+            this.audioContext = null;
+            if (context.state !== 'closed') {
+                context.close().catch(() => {});
+            }
         }
         if (this.ws) {
             this.ws.close();

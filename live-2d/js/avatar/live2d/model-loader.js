@@ -22,7 +22,7 @@ class Live2DModelLoader {
 
     /**
      * 加载 Live2D 模型（带加载锁与并发 token）
-     * @param {string} modelPath 相对 live-2d 目录的路径，如 "2D/肥牛/肥牛.model3.json"
+     * @param {string} modelPath 相对 live-2d 目录的路径，如 "2D/肥鱼/肥鱼.model3.json"
      * @param {object} options { config, preferences, fallbackPath, notifyLoaded }
      *   - config: 全局 config（读取 ui.model_scale / ui.model_position 作为回退）
      *   - preferences: 该模型的持久化偏好 { position: {x,y,x_dual,y_dual}, scale }（legacy 语义）

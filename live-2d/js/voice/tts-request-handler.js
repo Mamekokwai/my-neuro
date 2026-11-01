@@ -208,7 +208,7 @@ class TTSRequestHandler {
                 });
 
                 if (!response.ok) {
-                    await this.handleTTSError(response, this.useGateway ? '云端肥牛网关TTS' : '本地TTS');
+                    await this.handleTTSError(response, this.useGateway ? '云端肥鱼网关TTS' : '本地TTS');
                 }
                 return await response.blob();
             }

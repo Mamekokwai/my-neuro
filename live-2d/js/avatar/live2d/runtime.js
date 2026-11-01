@@ -5,7 +5,7 @@
 //            "motion 是否正在驱动嘴部/眼部"（让位判定）
 //   注入点2: hook coreModel.update —— 渲染前最后写入：口型（说话时强制覆盖）、
 //            程序化眨眼（SDK 原生 eyeBlink 缺失时）、呼吸兜底
-//   视线跟随: 走 pixi-live2d-display 的 FocusController（model.focus），
+//   视线跟随: 走 pixi-live2d-display 的 FocusController，
 //            以 config.ui.focus_factor 为跟随强度（旧配置项，此前无消费者）
 const { logToTerminal } = require('../../api-utils.js');
 const { ParamDirector } = require('./param-director.js');
@@ -60,7 +60,9 @@ class Live2DRuntime {
         this._gazeEnabled = true;
         this._focusFactor = 1;
         this._mouseHandler = null;
+        this._gazePoint = null;
         this._lastFocus = null;
+        this._eyeCenterLocal = null;
 
         // hook 管理
         this._installed = false;
@@ -223,6 +225,8 @@ class Live2DRuntime {
         };
 
         this._setupGaze();
+        this._eyeCenterLocal = this._findEyeCenter(internalModel, coreModel);
+        logToTerminal('info', `[Gaze] 眼睛位置: ${JSON.stringify(this._eyeCenterLocal)}`);
         this._installed = true;
         logToTerminal('info', `[Live2DRuntime] 已安装: 嘴部=${Object.keys(this._mouthParamIndices).join('/') || '无'}, 程序化眨眼=${this._blinkEnabled ? '开' : '关(SDK原生或无参数)'}, 呼吸兜底=${this._breathEnabled ? '开' : '关(SDK原生)'}, 视线跟随=${this._gazeEnabled ? '开' : '关'}(强度${this._focusFactor})`);
         return true;
@@ -397,6 +401,37 @@ class Live2DRuntime {
 
     // ============ 视线跟随 ============
 
+    _findEyeCenter(internalModel, coreModel) {
+        const fallback = {
+            x: internalModel.originalWidth / 2,
+            y: internalModel.originalHeight * 0.22
+        };
+        try {
+            const raw = coreModel.getModel();
+            const eyeParts = ['Part43', 'Part35'].map(id => Array.from(raw.parts.ids).indexOf(id));
+            if (eyeParts.some(index => index < 0)) return fallback;
+            const centers = [];
+            for (let i = 0; i < coreModel.getDrawableCount(); i++) {
+                if (!eyeParts.includes(raw.drawables.parentPartIndices[i])) continue;
+                const vertices = internalModel.getDrawableVertices(i);
+                if (!vertices?.length) continue;
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                for (let j = 0; j < vertices.length; j += 2) {
+                    minX = Math.min(minX, vertices[j]); maxX = Math.max(maxX, vertices[j]);
+                    minY = Math.min(minY, vertices[j + 1]); maxY = Math.max(maxY, vertices[j + 1]);
+                }
+                centers.push({ x: (minX + maxX) / 2, y: (minY + maxY) / 2 });
+            }
+            if (!centers.length) return fallback;
+            return {
+                x: centers.reduce((sum, point) => sum + point.x, 0) / centers.length,
+                y: centers.reduce((sum, point) => sum + point.y, 0) / centers.length
+            };
+        } catch (_) {
+            return fallback;
+        }
+    }
+
     _setupGaze() {
         if (this._mouseHandler) {
             window.removeEventListener('mousemove', this._mouseHandler);
@@ -407,33 +442,42 @@ class Live2DRuntime {
             pending = true;
             requestAnimationFrame(() => {
                 pending = false;
-                this._applyGaze(e.clientX, e.clientY);
+                const point = this._mapPointerToStage(e.clientX, e.clientY);
+                this._applyGaze(point.x, point.y);
             });
         };
         window.addEventListener('mousemove', this._mouseHandler, { passive: true });
     }
 
+    _mapPointerToStage(clientX, clientY) {
+        const interaction = globalThis.__live2dApp?.renderer?.plugins?.interaction;
+        if (interaction?.mapPositionToPoint) {
+            if (!this._gazePoint) this._gazePoint = { x: 0, y: 0 };
+            interaction.mapPositionToPoint(this._gazePoint, clientX, clientY);
+            return this._gazePoint;
+        }
+        return { x: clientX, y: clientY };
+    }
+
     _applyGaze(clientX, clientY) {
         const model = this.model;
-        if (!model || typeof model.focus !== 'function') return;
+        const controller = model?.internalModel?.focusController;
+        if (!controller || !this._eyeCenterLocal) return;
         try {
-            // 以模型头部附近为锚点，按 focus_factor 衰减跟随幅度
-            const anchorX = model.x + model.width / 2;
-            const anchorY = model.y + model.height * 0.3;
-            const fx = anchorX + (clientX - anchorX) * this._focusFactor;
-            const fy = anchorY + (clientY - anchorY) * this._focusFactor;
-            model.focus(fx, fy);
-            this._lastFocus = { x: fx, y: fy };
+            // model.focus() uses the full canvas center, which is below this model's eyes.
+            const eye = model.toGlobal(this._eyeCenterLocal);
+            const range = Math.max(model.width * 0.8, 200);
+            const x = Math.max(-1, Math.min(1, (clientX - eye.x) / range * this._focusFactor));
+            const y = Math.max(-1, Math.min(1, (eye.y - clientY) / range * this._focusFactor));
+            controller.focus(x, y);
+            this._lastFocus = { x, y };
         } catch (_) {}
     }
 
     setGazeTracking(enabled) {
         this._gazeEnabled = !!enabled;
         if (!enabled && this.model) {
-            // 关闭时视线回正（对准模型头部锚点，FocusController 自带平滑）
-            try {
-                this.model.focus(this.model.x + this.model.width / 2, this.model.y + this.model.height * 0.3);
-            } catch (_) {}
+            try { this.model.internalModel?.focusController?.focus(0, 0); } catch (_) {}
         }
     }
 

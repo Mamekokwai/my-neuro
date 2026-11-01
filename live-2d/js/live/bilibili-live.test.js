@@ -6,11 +6,11 @@ const { normalizeBilibiliEvent } = require('./bilibili-events.js');
 const { LiveStreamModule } = require('./LiveStreamModule.js');
 
 test('解析普通弹幕帧', () => {
-    const command = { cmd: 'DANMU_MSG', info: [[], '你好肥牛', [123, '测试观众']] };
+    const command = { cmd: 'DANMU_MSG', info: [[], '你好肥鱼', [123, '测试观众']] };
     const frames = parseFrame(encodePacket(OP.MESSAGE, JSON.stringify(command)));
     assert.equal(frames.length, 1);
     assert.deepEqual(normalizeBilibiliEvent(frames[0].message), {
-        type: 'danmaku', nickname: '测试观众', text: '你好肥牛'
+        type: 'danmaku', nickname: '测试观众', text: '你好肥鱼'
     });
 });
 

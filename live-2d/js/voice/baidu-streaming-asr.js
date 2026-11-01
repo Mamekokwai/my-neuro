@@ -12,13 +12,14 @@ function generateId() {
 class BaiduStreamingASR {
     constructor(config) {
         this.config = config;
+        this.sourceName = '百度流式ASR';
 
         // 百度ASR配置
         const baiduConfig = config.cloud?.baidu_asr || {};
         this.wsUrl = baiduConfig.url || 'ws://vop.baidu.com/realtime_asr';
         this.appid = baiduConfig.appid;
         this.appkey = baiduConfig.appkey;
-        this.devPid = baiduConfig.dev_pid || 15372;
+        this.devPid = Number(baiduConfig.dev_pid || 15372);
 
         // 语音打断配置
         this.voiceBargeInEnabled = config.asr?.voice_barge_in || false;
@@ -40,6 +41,15 @@ class BaiduStreamingASR {
         this.mediaStream = null;
         this.ws = null;
         this.scriptNode = null;
+        this.microphoneNode = null;
+        this.silentSink = null;
+        this.mediaSink = null;
+        this.inputSampleRate = this.SAMPLE_RATE;
+        this.pcmChunk = new Int16Array(this.CHUNK_SIZE / 2);
+        this.pcmChunkLength = 0;
+        this.loggedAudioFrame = false;
+        this.loggedServerMessage = false;
+        this.fatalError = false;
 
         // 回调
         this.onSpeechRecognized = null;
@@ -82,17 +92,28 @@ class BaiduStreamingASR {
                 this.isConnected = true;
                 this.retryCount = 0;
                 this.sendStartFrame();
+                logToTerminal('info', '百度流式ASR连接已建立');
                 resolve();
             };
 
             this.ws.onmessage = (event) => {
+                if (!this.loggedServerMessage) {
+                    this.loggedServerMessage = true;
+                    try {
+                        const response = JSON.parse(event.data);
+                        logToTerminal('info', `百度流式ASR服务响应: ${response.type || '未知类型'}${response.err_no !== undefined ? `, err_no=${response.err_no}` : ''}`);
+                    } catch (_) {}
+                }
                 this.handleMessage(event.data);
             };
 
             this.ws.onclose = (event) => {
                 this.isConnected = false;
+                if (this.isRecording) {
+                    logToTerminal('warn', `百度流式ASR连接断开: code=${event.code}`);
+                }
 
-                if (this.isRecording && this.retryCount < this.MAX_RETRIES) {
+                if (this.isRecording && !this.fatalError && this.retryCount < this.MAX_RETRIES) {
                     this.retryCount++;
                     this.reconnectTimeout = setTimeout(() => {
                         this.connectWebSocket().catch(console.error);
@@ -108,10 +129,16 @@ class BaiduStreamingASR {
     }
 
     sendStartFrame() {
+        const appid = Number(this.appid);
+        if (!Number.isSafeInteger(appid) || !Number.isSafeInteger(this.devPid) || !this.appkey) {
+            logToTerminal('error', '百度流式ASR配置缺少有效的 AppID、API Key 或模型 PID');
+            this.ws.close();
+            return;
+        }
         const startFrame = {
             type: 'START',
             data: {
-                appid: this.appid,
+                appid,
                 appkey: this.appkey,
                 dev_pid: this.devPid,
                 cuid: 'live2d_client_' + generateId().substring(0, 8),
@@ -134,6 +161,15 @@ class BaiduStreamingASR {
         try {
             const result = JSON.parse(message);
 
+            if (result.err_no !== undefined && result.err_no !== 0) {
+                logToTerminal('error', `百度流式ASR错误: ${result.err_no} - ${result.err_msg || '未知错误'}`);
+                if (result.err_no === -3004 || result.err_no === -3008) {
+                    this.fatalError = true;
+                    this.stopRecording();
+                }
+                return;
+            }
+
             if (result.type === 'MID_TEXT') {
                 const interimText = result.result || '';
                 this.currentInterimText = interimText;
@@ -155,9 +191,6 @@ class BaiduStreamingASR {
                     this.onSpeechRecognized(finalText);
                 }
 
-            } else if (result.err_no !== undefined && result.err_no !== 0) {
-                const errMsg = result.err_msg || '未知错误';
-                logToTerminal('error', `百度流式ASR错误: ${result.err_no} - ${errMsg}`);
             }
         } catch (e) {
             // 忽略非JSON消息
@@ -186,25 +219,44 @@ class BaiduStreamingASR {
         }
 
         try {
+            this.fatalError = false;
             await this.connectWebSocket();
+            if (this.fatalError || !this.isConnected) return;
 
+            const inputs = (await navigator.mediaDevices.enumerateDevices())
+                .filter(device => device.kind === 'audioinput');
+            const inputLabel = this.config.asr?.input_device_label;
+            const selectedInput = inputLabel && inputs.find(device =>
+                device.deviceId !== 'default' &&
+                device.deviceId !== 'communications' &&
+                device.label.includes(inputLabel)
+            );
             this.mediaStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
+                    ...(selectedInput ? { deviceId: { exact: selectedInput.deviceId } } : {}),
                     channelCount: this.CHANNELS,
-                    sampleRate: this.SAMPLE_RATE,
-                    echoCancellation: true,
-                    noiseSuppression: true
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
                 }
             });
+            const inputTrack = this.mediaStream.getAudioTracks()[0];
+            logToTerminal('info', `[${this.sourceName}] 输入设备: ${inputTrack?.label || '未知'}`);
 
-            this.audioContext = new AudioContext({ sampleRate: this.SAMPLE_RATE });
-            const microphone = this.audioContext.createMediaStreamSource(this.mediaStream);
+            // Ulanzi 使用原生采样率，避免 Windows 因 16 kHz 重协商而暂停其他音频。
+            this.audioContext = new AudioContext();
+            this.inputSampleRate = this.audioContext.sampleRate;
+            this.microphoneNode = this.audioContext.createMediaStreamSource(this.mediaStream);
 
             const bufferSize = 4096;
             this.scriptNode = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
+            this.silentSink = this.audioContext.createGain();
+            this.silentSink.gain.value = 0;
+            this.mediaSink = this.audioContext.createMediaStreamDestination();
 
-            microphone.connect(this.scriptNode);
-            this.scriptNode.connect(this.audioContext.destination);
+            this.microphoneNode.connect(this.scriptNode);
+            this.scriptNode.connect(this.silentSink);
+            this.silentSink.connect(this.mediaSink);
 
             this.scriptNode.onaudioprocess = (e) => {
                 if (!this.isRecording || !this.isConnected) return;
@@ -212,15 +264,32 @@ class BaiduStreamingASR {
 
                 if (!this.voiceBargeInEnabled && this.asrLocked) return;
 
-                const audioData = e.inputBuffer.getChannelData(0);
-                const pcmData = this.float32ToInt16(audioData);
-                this.ws.send(pcmData.buffer);
+                const audioData = this.resampleAudioData(
+                    e.inputBuffer.getChannelData(0), this.inputSampleRate, this.SAMPLE_RATE
+                );
+                for (const sample of audioData) {
+                    const clamped = Math.max(-1, Math.min(1, sample));
+                    this.pcmChunk[this.pcmChunkLength++] = clamped < 0
+                        ? clamped * 0x8000 : clamped * 0x7FFF;
+                    if (this.pcmChunkLength === this.pcmChunk.length) {
+                        this.ws.send(this.pcmChunk.slice().buffer);
+                        this.pcmChunkLength = 0;
+                        if (!this.loggedAudioFrame) {
+                            this.loggedAudioFrame = true;
+                            logToTerminal('info', `${this.sourceName}正在发送 16 kHz PCM 音频`);
+                        }
+                    }
+                }
             };
 
+            if (this.fatalError || !this.isConnected) {
+                this.stopRecording();
+                return;
+            }
             this.isRecording = true;
 
         } catch (error) {
-            logToTerminal('error', `百度流式ASR启动失败: ${error.message}`);
+            logToTerminal('error', `${this.sourceName}启动失败: ${error.message}`);
         }
     }
 
@@ -233,15 +302,46 @@ class BaiduStreamingASR {
         return int16Array;
     }
 
+    resampleAudioData(samples, sourceRate, targetRate) {
+        if (sourceRate === targetRate) return samples;
+        const output = new Float32Array(Math.max(1, Math.round(samples.length * targetRate / sourceRate)));
+        const ratio = sourceRate / targetRate;
+        for (let i = 0; i < output.length; i++) {
+            const position = i * ratio;
+            const left = Math.floor(position);
+            const right = Math.min(left + 1, samples.length - 1);
+            output[i] = samples[left] + (samples[right] - samples[left]) * (position - left);
+        }
+        return output;
+    }
+
     stopRecording() {
         this.isRecording = false;
 
         this.sendFinishFrame();
 
         if (this.scriptNode) {
+            this.scriptNode.onaudioprocess = null;
             this.scriptNode.disconnect();
             this.scriptNode = null;
         }
+
+        if (this.microphoneNode) {
+            this.microphoneNode.disconnect();
+            this.microphoneNode = null;
+        }
+
+        if (this.silentSink) {
+            this.silentSink.disconnect();
+            this.silentSink = null;
+        }
+
+        if (this.mediaSink) {
+            this.mediaSink.stream.getTracks().forEach(track => track.stop());
+            this.mediaSink.disconnect();
+            this.mediaSink = null;
+        }
+        this.pcmChunkLength = 0;
 
         if (this.mediaStream) {
             this.mediaStream.getTracks().forEach(track => track.stop());

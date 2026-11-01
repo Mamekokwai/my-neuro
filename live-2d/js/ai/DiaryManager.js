@@ -170,7 +170,7 @@ ${todayInteractions}
                 fs.mkdirSync(diaryDir, { recursive: true });
             }
 
-            const diaryEntry = `------------------------------------\n[${dateStr}] 肥牛的日记\n\n${diaryContent}\n\n`;
+            const diaryEntry = `------------------------------------\n[${dateStr}] 肥鱼的日记\n\n${diaryContent}\n\n`;
 
             fs.appendFileSync(diaryPath, diaryEntry, 'utf8');
             console.log('AI日记已保存到文件');

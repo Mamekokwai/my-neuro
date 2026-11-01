@@ -96,7 +96,7 @@ class VRMInteractionController {
             });
         }
 
-        // VMC开关（肥牛独有功能，保留）
+        // VMC开关（肥鱼独有功能，保留）
         const vmcBtn = document.getElementById('btn-toggle-vmc');
         if (vmcBtn) {
             vmcBtn.style.display = this.model.modelType === 'mmd' ? 'none' : '';

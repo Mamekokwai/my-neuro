@@ -126,7 +126,7 @@ class ScreenshotManager {
             errorDetail = "无法读取错误详情";
         }
 
-        const serviceName = this.bertApiKey ? '云端肥牛网关BERT' : '本地BERT';
+        const serviceName = this.bertApiKey ? '云端肥鱼网关BERT' : '本地BERT';
         let errorMessage = "";
         switch (response.status) {
             case 401:

@@ -55,7 +55,7 @@ class MoodChatModule {
 
         // 心情评估配置
         this.moodEvaluationPrompt = moodConfig.evaluation_prompt ||
-            "请根据以下内容，评估fake neuro（肥牛）今天的心情分数（0-100分）。只返回一个数字，不要其他内容。";
+            "请根据以下内容，评估fake neuro（肥鱼）今天的心情分数（0-100分）。只返回一个数字，不要其他内容。";
     }
 
     /**
@@ -183,7 +183,7 @@ class MoodChatModule {
             // 情况3：有历史记录，开始智能评估
             logToTerminal('info', `🔍 发现历史记录（日记:${hasDiary ? '✓' : '✗'} 记忆:${hasMemory ? '✓' : '✗'}），开始评估心情...`);
 
-            const prompt = `请根据以下内容，评估fake neuro（肥牛）的心情分数（0-100分）。只返回一个数字。\n\n${contextContent}`;
+            const prompt = `请根据以下内容，评估fake neuro（肥鱼）的心情分数（0-100分）。只返回一个数字。\n\n${contextContent}`;
 
             const response = await fetch(`${voiceChat.API_URL}/chat/completions`, {
                 method: 'POST',

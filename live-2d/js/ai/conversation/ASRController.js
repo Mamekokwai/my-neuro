@@ -1,6 +1,7 @@
 // ASRController.js - ASR控制器
 const { ASRProcessor } = require('../../voice/asr-processor.js');
 const { BaiduStreamingASR } = require('../../voice/baidu-streaming-asr.js');
+const { LocalStreamingASR } = require('../../voice/local-streaming-asr.js');
 const { eventBus } = require('../../core/event-bus.js');
 const { Events } = require('../../core/events.js');
 
@@ -15,6 +16,8 @@ class ASRController {
 
         // 检查是否使用百度流式ASR
         this.useBaiduStreamingASR = config.cloud?.baidu_asr?.enabled === true;
+        this.useLocalStreamingASR = config.asr?.local_streaming?.enabled === true;
+        this.useContinuousStreamingASR = this.useBaiduStreamingASR || this.useLocalStreamingASR;
 
         this.useSiliconFlowASR = config.cloud?.siliconflow_asr?.enabled === true;
 
@@ -34,7 +37,10 @@ class ASRController {
         }
 
         // 根据配置选择ASR处理器
-        if (this.useBaiduStreamingASR) {
+        if (this.useLocalStreamingASR) {
+            this.asrProcessor = new LocalStreamingASR(config);
+            this.setupInterimResultCallback();
+        } else if (this.useBaiduStreamingASR) {
             // 使用百度流式ASR
             console.log('使用百度流式ASR');
             this.asrProcessor = new BaiduStreamingASR(config);
@@ -73,7 +79,8 @@ class ASRController {
 
         const flush = async (showSubtitle) => {
             // 如果用户还在说话或 ASR 还在处理，推迟 200ms 再检查
-            if (this.asrProcessor?.isRecording || this.asrProcessor?.asrLocked) {
+            if (!this.useContinuousStreamingASR &&
+                (this.asrProcessor?.isRecording || this.asrProcessor?.asrLocked)) {
                 this._mergeTimer = setTimeout(() => flush(showSubtitle), 200);
                 return;
             }

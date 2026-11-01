@@ -6,7 +6,7 @@ const path = require('path');
  * 负责扫描 2D 文件夹中的模型文件，并自动更新 app.js 中的模型路径
  */
 class ModelPathUpdater {
-    constructor(appPath, priorityFolders = ['肥牛', 'Hiyouri', 'Default', 'Main']) {
+    constructor(appPath, priorityFolders = ['肥鱼', 'Hiyouri', 'Default', 'Main']) {
         this.appPath = appPath;
         this.modelDir = path.join(appPath, '2D');
         this.modelSetupJsPath = path.join(appPath, 'js', 'model', 'model-setup.js');

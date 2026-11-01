@@ -27,7 +27,7 @@ class DynamicPersonaPlugin extends Plugin {
         try {
             this.persona = await this.context.callLLM(
                 `现在是${timeStr}，用户说："${userText}"。\n` +
-                `请用10字以内描述肥牛此刻的状态/心情，影响她这次回复的语气。` +
+                `请用10字以内描述肥鱼此刻的状态/心情，影响她这次回复的语气。` +
                 `只输出状态本身，不要解释，例如："有点犯困但还在撑" 或 "突然对这个话题来了兴趣"`,
                 { temperature: 1.2 }
             );

@@ -152,7 +152,7 @@ class EmotionEngine {
             const match = decodeURIComponent(modelPath).match(/2D\/([^\/]+)\//);
             if (match) return match[1];
         } catch (_) {}
-        return '肥牛';
+        return '肥鱼';
     }
 
     async loadConfig() {

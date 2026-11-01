@@ -19,6 +19,8 @@ class TTSPlaybackEngine {
 
         // 当前状态
         this.currentAudio = null;
+        this.currentSource = null;
+        this.currentGainNode = null;
         this.currentAudioUrl = null;
         this.isPlaying = false;
         this.shouldStop = false;
@@ -55,6 +57,7 @@ class TTSPlaybackEngine {
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = 256;
             this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+            this.analyser.connect(this.audioContext.destination);
         }
     }
 
@@ -64,6 +67,14 @@ class TTSPlaybackEngine {
         
         await this.initAudioContext();
         this.currentSegmentText = segmentText;
+
+        let audioBuffer;
+        try {
+            audioBuffer = await this.audioContext.decodeAudioData(await audioBlob.arrayBuffer());
+        } catch (error) {
+            console.error('TTS音频解码失败:', error);
+            return { error: true };
+        }
         
         return new Promise((resolve) => {
             if (this.shouldStop) {
@@ -82,17 +93,24 @@ class TTSPlaybackEngine {
             if (this.onStartCallback) this.onStartCallback();
             eventBus.emit(Events.TTS_START);
             
-            // 创建音频
-            this.currentAudioUrl = URL.createObjectURL(audioBlob);
-            this.currentAudio = new Audio(this.currentAudioUrl);
-            
-            // 创建音频链路
+            // 用 Web Audio 缓冲播放，避免 HTMLAudioElement 申请独占媒体焦点。
+            const source = this.audioContext.createBufferSource();
+            source.buffer = audioBuffer;
             const gainNode = this.audioContext.createGain();
             gainNode.gain.value = 1.0;
-            const source = this.audioContext.createMediaElementSource(this.currentAudio);
             source.connect(gainNode);
             gainNode.connect(this.analyser);
-            this.analyser.connect(this.audioContext.destination);
+            this.currentSource = source;
+            this.currentGainNode = gainNode;
+            const audioState = {
+                duration: audioBuffer.duration,
+                currentTime: 0,
+                _fadeOutTimer: null,
+                pause: () => {
+                    try { source.stop(); } catch (_) {}
+                }
+            };
+            this.currentAudio = audioState;
             
             // 预处理文本（提取情绪标记和表情标记）
             let processedText = segmentText;
@@ -276,8 +294,6 @@ class TTSPlaybackEngine {
             };
             
             // 设置音频事件
-            this.currentAudio.oncanplaythrough = () => startTextAnimation();
-            
             this.currentAudio.onplay = () => {
                 updateMouth();
                 
@@ -293,6 +309,12 @@ class TTSPlaybackEngine {
                         }
                     }, (audioDuration - fadeOutDuration) * 1000);
                     this.currentAudio._fadeOutTimer = fadeOutTimer;
+                }
+            };
+
+            source.onended = () => {
+                if (this.currentAudio === audioState && audioState.onended) {
+                    audioState.onended();
                 }
             };
             
@@ -381,8 +403,15 @@ class TTSPlaybackEngine {
             };
             
             
-            // 开始播放
-            this.currentAudio.play().catch(error => {
+            // 开始播放。AudioBufferSourceNode 不建立 HTML 媒体会话，因此不会暂停其他播放器。
+            try {
+                if (this.audioContext.state === 'suspended') {
+                    this.audioContext.resume().catch(() => {});
+                }
+                startTextAnimation();
+                this.currentAudio.onplay();
+                source.start(0);
+            } catch (error) {
                 console.error('播放失败:', error);
 
                 // 播放失败时切换默认表情
@@ -395,12 +424,21 @@ class TTSPlaybackEngine {
                 // 注意：不在这里发射 TTS_END 和调用 onEndCallback
                 // 由 tts-processor.js 的 handleAllComplete() 统一处理
                 resolve({ error: true });
-            });
+            }
         });
     }
 
     // 清理资源
     cleanup() {
+        if (this.currentSource) {
+            this.currentSource.onended = null;
+            try { this.currentSource.disconnect(); } catch (_) {}
+            this.currentSource = null;
+        }
+        if (this.currentGainNode) {
+            try { this.currentGainNode.disconnect(); } catch (_) {}
+            this.currentGainNode = null;
+        }
         if (this.currentAudioUrl) {
             URL.revokeObjectURL(this.currentAudioUrl);
             this.currentAudioUrl = null;
@@ -439,10 +477,11 @@ class TTSPlaybackEngine {
         if (this.currentAudio) {
             this.currentAudio.onended = null;
             this.currentAudio.onplay = null;
-            this.currentAudio.oncanplaythrough = null;
             this.currentAudio.onerror = null;
-            this.currentAudio.pause();
-            this.currentAudio.src = "";
+        }
+        if (this.currentSource) {
+            this.currentSource.onended = null;
+            try { this.currentSource.stop(); } catch (_) {}
         }
 
         this.cleanup();

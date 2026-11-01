@@ -68,8 +68,11 @@ class Live2DStage {
             width,
             height,
             resolution,
+            antialias: true,
             autoDensity: true
         });
+        // 视线跟随需要使用 Pixi InteractionManager 的坐标换算，避免分辨率缩放偏移。
+        window.__live2dApp = this.app;
 
         // 兼容旧全局：新坐标系下缩放因子恒为 1
         window.canvasScaleFactor = 1;
@@ -93,7 +96,10 @@ class Live2DStage {
         }
         this._startFpsGovernor();
 
-        const diag = `[Live2DStage] 初始化完成: ${width}x${height} CSS px, resolution=${resolution}, maxFPS=${this._activeFps}`;
+        const antialias = this.app.renderer.gl?.getContextAttributes()?.antialias;
+        const gl = this.app.renderer.gl;
+        const samples = gl ? gl.getParameter(gl.SAMPLES) : 0;
+        const diag = `[Live2DStage] 初始化完成: ${width}x${height} CSS px, resolution=${resolution}, antialias=${antialias}, samples=${samples}, maxFPS=${this._activeFps}`;
         console.log(diag);
         logToTerminal('info', diag);
         return this.app;
