@@ -52,7 +52,6 @@ class Live2DInteractionController {
         // 防御：重绑/形态恢复时取消可能仍在进行的回弹动画，
         // 避免旧模型的动画帧继续按过期 startX/dx 改写新模型位置
         this._cancelBounce();
-        this._unbindMotionLoop();
         this.model = model;
         this.app = app;
         this.config = config;
@@ -71,7 +70,6 @@ class Live2DInteractionController {
         this._setupPointerEvents();
         this._setupChatDrag();
         this._setupWindowEvents();
-        this._ensureMotionLoop();
     }
 
     // ============ 交互区 ============
@@ -149,8 +147,6 @@ class Live2DInteractionController {
             if (extend?.extend && extend?.left && newX < 0) newX = 0;
 
             this.model.position.set(newX, newY);
-            this._injectDragMotion(newX - (this._lastPos?.x ?? newX), newY - (this._lastPos?.y ?? newY));
-            this._lastPos = { x: newX, y: newY };
             this.updateInteractionArea();
             this._maybeExpandPetWindow(newX, newY);
             this._notifyActivity();
@@ -159,10 +155,6 @@ class Live2DInteractionController {
         this._on(window, 'pointerup', (e) => {
             if (!this.isDragging) return;
             this.isDragging = false;
-            this._lastPos = null;
-            // 松手：目标角归零，物理惯性会让头发尾巴多甩两下
-            this._dragAngleTarget = { x: 0, y: 0 };
-            this._ensureMotionLoop();
 
             // 点击判定：位移小且时间短 -> 触发 Tap 动作（旧实现因拖拽误触被整段禁用，
             // 这里用位移阈值解决误触问题后恢复该交互）
@@ -230,111 +222,6 @@ class Live2DInteractionController {
     }
 
     // 聊天框拖拽（保持旧行为：按住聊天框背景/消息区可拖动聊天框）
-    _injectDragMotion(dx, dy) {
-        // 只测速：pointermove 位移换算成速度并低通。加速度/弹簧都在 _applyDragParams 里按帧积分。
-        const now = performance.now();
-        const dt = Math.max(now - (this._lastMoveT || now), 8) / 1000;
-        this._lastMoveT = now;
-        const VS = this._tune?.v_smooth ?? 0.45;
-        const v = this._v || (this._v = { x: 0, y: 0 });
-        v.x += (dx / dt - v.x) * VS;
-        v.y += (dy / dt - v.y) * VS;
-    }
-
-    _ensureMotionLoop() {
-        // IDLE 动作每帧把身体参数写回默认值，rAF 抢不过它。
-        // 挂 afterMotionUpdate：motion 之后、physics 之前。
-        const im = this.model?.internalModel;
-        if (!im) return;
-        if (this._motionInternalModel === im) return;
-        this._unbindMotionLoop();
-        this._motionInternalModel = im;
-        this._motionHook = () => this._applyDragParams();
-        im.on('afterMotionUpdate', this._motionHook);
-    }
-
-    _unbindMotionLoop() {
-        if (this._motionInternalModel && this._motionHook) this._motionInternalModel.off('afterMotionUpdate', this._motionHook);
-        this._motionInternalModel = null;
-        this._motionHook = null;
-    }
-
-    _applyDragParams() {
-        const c = this.model?.internalModel?.coreModel;
-        if (!c) return;
-        const cl = (v, lim) => Math.max(-lim, Math.min(lim, v));
-
-        this._pollTuner();
-        const T = this._tune || {};
-        const FORCE = T.force ?? 8000;
-        const ACC_REF = T.acc_ref ?? 4500;
-        const SPRING = T.spring ?? 300;
-        const DAMP = T.damp ?? 90;
-        const GAIN = T.gain ?? 0.4;
-        const CLAMP = T.clamp ?? 45;
-        const ACC_S = T.acc_smooth ?? 0.35;
-        const VDECAY = T.vel_decay ?? 0.55;
-        const EPS = T.rest_eps ?? 0.05;
-        const MAX_DT = (T.max_dt ?? 50) / 1000;
-        // T.manual 由面板下发，见下方覆盖逻辑
-
-        const now = performance.now();
-        const dt = Math.min(Math.max((now - (this._lastFrameT || now)) / 1000, 0.001), MAX_DT);
-        this._lastFrameT = now;
-
-        const v = this._v || (this._v = { x: 0, y: 0 });
-        if (!this.isDragging) { v.x *= VDECAY; v.y *= VDECAY; }
-
-        const prev = this._prevV || (this._prevV = { x: 0, y: 0 });
-        const acc = this._acc || (this._acc = { x: 0, y: 0 });
-        acc.x += ((v.x - prev.x) / dt - acc.x) * ACC_S;
-        acc.y += ((v.y - prev.y) / dt - acc.y) * ACC_S;
-        prev.x = v.x; prev.y = v.y;
-
-        // 弹簧-阻尼：外力来自加速度；加速度为 0 时只剩弹簧回正
-        const sk = this._spring || (this._spring = { x: 0, y: 0, vx: 0, vy: 0 });
-        const fx = Math.tanh(acc.x / ACC_REF) * FORCE;
-        const fy = Math.tanh(acc.y / ACC_REF) * FORCE;
-
-        sk.vx += (fx - SPRING * sk.x - DAMP * sk.vx) * dt;
-        sk.vy += (fy - SPRING * sk.y - DAMP * sk.vy) * dt;
-        sk.x = cl(sk.x + sk.vx * dt, CLAMP);
-        sk.y = cl(sk.y + sk.vy * dt, CLAMP);
-
-        const rest = Math.abs(sk.x) < EPS && Math.abs(sk.y) < EPS &&
-                     Math.abs(sk.vx) < EPS && Math.abs(sk.vy) < EPS && !this.isDragging;
-        if (rest) {
-            sk.x = 0; sk.y = 0; sk.vx = 0; sk.vy = 0;
-            for (const id of ['PositionX', 'PositionY', 'PositionZ', 'LeanInput']) {
-                if (global.live2dTuner?.catalog.has(id)) c.setParameterValueById(id, 0);
-            }
-            this._applyManual(c, T);
-            return;
-        }
-
-        // 左右头发各用一个参数：右发走 PositionX，左发走 LeanInput。
-        // 每侧两档权重——朝各自"漂浮方向"拖给满幅，反向拖只给一点点（归位），
-        // 这样反向回来时头发是轻轻飘回去，而不是被硬拽回原位。
-        const base = cl(-sk.x / GAIN, 10);
-        // 右发：对左移敏感（大权重），右移迟钝（小权重）；左发相反
-        const right = base >= 0 ? base * (T.w_rr ?? 0.3) : base * (T.w_rf ?? 1.0);
-        const left = base >= 0 ? base * (T.w_lf ?? -1.0) : base * (T.w_lr ?? -0.3);
-        c.setParameterValueById('PositionX', cl(right, 10));
-        c.setParameterValueById('LeanInput', cl(left, 10));
-        c.setParameterValueById('PositionY', 0);
-        c.setParameterValueById('PositionZ', 0);
-
-        this._applyManual(c, T);
-    }
-
-    _applyManual(c) {
-        global.live2dTuner?.applyManual(c, true);
-    }
-
-    _pollTuner() {
-        this._tune = global.live2dTuner?.state || null;
-    }
-
     _setupChatDrag() {
         const chatContainer = document.getElementById('text-chat-container');
         if (!chatContainer) return;
@@ -586,24 +473,6 @@ class Live2DInteractionController {
         this.updateInteractionArea();
         // 防御：若配置里存了越界的相对位置（例如旧版跨屏 bug 导致的负值），启动时吸回当前窗口内。
         this._clampModelToWindow();
-        this._bindPhysicsHook();
-    }
-
-    _bindPhysicsHook() {
-        // 模型是异步加载的，这里轮询直到 internalModel 就绪，
-        // 挂上 afterMotionUpdate 后即使不拖拽，实时面板也有数据。
-        const tryBind = () => {
-            const im = this.model?.internalModel;
-            if (!im?.coreModel) return false;
-            this._ensureMotionLoop();
-            this._pollTuner();
-            return true;
-        };
-        if (tryBind()) return;
-        let tries = 0;
-        const timer = setInterval(() => {
-            if (tryBind() || ++tries > 40) clearInterval(timer);
-        }, 500);
     }
 
     _scheduleSave() {
@@ -695,7 +564,6 @@ class Live2DInteractionController {
     }
 
     destroy() {
-        this._unbindMotionLoop();
         this._teardownListeners();
         this._cancelBounce();
         if (this._saveTimer) {
