@@ -61,6 +61,9 @@ class ASRController {
     setupInterimResultCallback() {
         if (this.asrProcessor.setOnInterimResult) {
             this.asrProcessor.setOnInterimResult((interimText) => {
+                // 本地流式 + 离线二次识别时，interim 没有标点、final 又会带标点重来一遍，
+                // 两条文本同时进字幕就是重影；默认只显示 final（可用 show_interim_subtitle 打开）
+                if (this.config.asr?.local_streaming?.show_interim_subtitle !== true) return;
                 const showSubtitle = this.inputRouter.showSubtitle;
                 // 显示临时字幕，不设置自动隐藏（会被下一次更新覆盖）
                 showSubtitle(`${this.config.subtitle_labels.user}: ${interimText}`, 0);
